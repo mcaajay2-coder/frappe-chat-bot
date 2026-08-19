@@ -1,0 +1,280 @@
+[
+ {
+  "app": "koinonia_assistant",
+  "charts": [],
+  "content": "[{\"id\": \"hdr_Koinonia_Assistant\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Koinonia Assistant</b></span>\", \"col\": 12}}, {\"id\": \"c_AI_Assistant_&_Analytics\", \"type\": \"card\", \"data\": {\"card_name\": \"AI Assistant & Analytics\", \"col\": 4}}, {\"id\": \"c_Registry_Direct_Access\", \"type\": \"card\", \"data\": {\"card_name\": \"Registry Direct Access\", \"col\": 4}}]",
+  "custom_blocks": [],
+  "docstatus": 0,
+  "doctype": "Workspace",
+  "external_link": null,
+  "for_user": null,
+  "hide_custom": 0,
+  "icon": "chat",
+  "indicator_color": "green",
+  "is_hidden": 0,
+  "label": "Koinonia Assistant",
+  "link_to": "koinonia-chat",
+  "link_type": "Page",
+  "links": [
+   {
+    "dependencies": null,
+    "description": null,
+    "hidden": 0,
+    "icon": null,
+    "is_query_report": 0,
+    "label": "AI Assistant & Analytics",
+    "link_count": 1,
+    "link_to": null,
+    "link_type": "DocType",
+    "onboard": 0,
+    "only_for": null,
+    "report_ref_doctype": null,
+    "type": "Card Break"
+   },
+   {
+    "dependencies": null,
+    "description": null,
+    "hidden": 0,
+    "icon": null,
+    "is_query_report": 0,
+    "label": "KOINONIA Assistant Chat",
+    "link_count": 0,
+    "link_to": "koinonia-chat",
+    "link_type": "Page",
+    "onboard": 1,
+    "only_for": null,
+    "report_ref_doctype": null,
+    "type": "Link"
+   },
+   {
+    "dependencies": null,
+    "description": null,
+    "hidden": 0,
+    "icon": null,
+    "is_query_report": 0,
+    "label": "Registry Direct Access",
+    "link_count": 6,
+    "link_to": null,
+    "link_type": "DocType",
+    "onboard": 0,
+    "only_for": null,
+    "report_ref_doctype": null,
+    "type": "Card Break"
+   },
+   {
+    "dependencies": null,
+    "description": null,
+    "hidden": 0,
+    "icon": null,
+    "is_query_report": 0,
+    "label": "Parish",
+    "link_count": 0,
+    "link_to": "Parish",
+    "link_type": "DocType",
+    "onboard": 1,
+    "only_for": null,
+    "report_ref_doctype": null,
+    "type": "Link"
+   },
+   {
+    "dependencies": null,
+    "description": null,
+    "hidden": 0,
+    "icon": null,
+    "is_query_report": 0,
+    "label": "Family",
+    "link_count": 0,
+    "link_to": "Family",
+    "link_type": "DocType",
+    "onboard": 1,
+    "only_for": null,
+    "report_ref_doctype": null,
+    "type": "Link"
+   },
+   {
+    "dependencies": null,
+    "description": null,
+    "hidden": 0,
+    "icon": null,
+    "is_query_report": 0,
+    "label": "Member",
+    "link_count": 0,
+    "link_to": "Member",
+    "link_type": "DocType",
+    "onboard": 1,
+    "only_for": null,
+    "report_ref_doctype": null,
+    "type": "Link"
+   },
+   {
+    "dependencies": null,
+    "description": null,
+    "hidden": 0,
+    "icon": null,
+    "is_query_report": 0,
+    "label": "Baptism",
+    "link_count": 0,
+    "link_to": "Baptism",
+    "link_type": "DocType",
+    "onboard": 1,
+    "only_for": null,
+    "report_ref_doctype": null,
+    "type": "Link"
+   },
+   {
+    "dependencies": null,
+    "description": null,
+    "hidden": 0,
+    "icon": null,
+    "is_query_report": 0,
+    "label": "Marriage",
+    "link_count": 0,
+    "link_to": "Marriage",
+    "link_type": "DocType",
+    "onboard": 1,
+    "only_for": null,
+    "report_ref_doctype": null,
+    "type": "Link"
+   },
+   {
+    "dependencies": null,
+    "description": null,
+    "hidden": 0,
+    "icon": null,
+    "is_query_report": 0,
+    "label": "Death",
+    "link_count": 0,
+    "link_to": "Death",
+    "link_type": "DocType",
+    "onboard": 1,
+    "only_for": null,
+    "report_ref_doctype": null,
+    "type": "Link"
+   }
+  ],
+  "modified": "2026-08-19 09:46:13.370900",
+  "module": "Koinonia Assistant",
+  "name": "Koinonia Assistant",
+  "number_cards": [],
+  "parent_page": null,
+  "public": 1,
+  "quick_lists": [],
+  "restrict_to_domain": null,
+  "roles": [
+   {
+    "role": "Bishop"
+   },
+   {
+    "role": "Chancellor"
+   },
+   {
+    "role": "Curia"
+   },
+   {
+    "role": "Vicar General"
+   },
+   {
+    "role": "Vicar Forane"
+   },
+   {
+    "role": "Parish Priest"
+   },
+   {
+    "role": "Priest"
+   },
+   {
+    "role": "Staff"
+   },
+   {
+    "role": "Parishioner"
+   },
+   {
+    "role": "Desk User"
+   },
+   {
+    "role": "System Manager"
+   },
+   {
+    "role": "Administrator"
+   },
+   {
+    "role": "All"
+   }
+  ],
+  "sequence_id": 0.5,
+  "shortcuts": [
+   {
+    "color": "Gold",
+    "doc_view": "",
+    "format": null,
+    "icon": null,
+    "kanban_board": null,
+    "label": "AI Sacred Assistant",
+    "link_to": "koinonia-chat",
+    "report_ref_doctype": null,
+    "restrict_to_domain": null,
+    "stats_filter": null,
+    "type": "Page",
+    "url": null
+   },
+   {
+    "color": "Blue",
+    "doc_view": "",
+    "format": null,
+    "icon": null,
+    "kanban_board": null,
+    "label": "Parishes",
+    "link_to": "Parish",
+    "report_ref_doctype": null,
+    "restrict_to_domain": null,
+    "stats_filter": null,
+    "type": "DocType",
+    "url": null
+   },
+   {
+    "color": "Green",
+    "doc_view": "",
+    "format": null,
+    "icon": null,
+    "kanban_board": null,
+    "label": "Families",
+    "link_to": "Family",
+    "report_ref_doctype": null,
+    "restrict_to_domain": null,
+    "stats_filter": null,
+    "type": "DocType",
+    "url": null
+   },
+   {
+    "color": "Cyan",
+    "doc_view": "",
+    "format": null,
+    "icon": null,
+    "kanban_board": null,
+    "label": "Baptisms",
+    "link_to": "Baptism",
+    "report_ref_doctype": null,
+    "restrict_to_domain": null,
+    "stats_filter": null,
+    "type": "DocType",
+    "url": null
+   },
+   {
+    "color": "Orange",
+    "doc_view": "",
+    "format": null,
+    "icon": null,
+    "kanban_board": null,
+    "label": "Marriages",
+    "link_to": "Marriage",
+    "report_ref_doctype": null,
+    "restrict_to_domain": null,
+    "stats_filter": null,
+    "type": "DocType",
+    "url": null
+   }
+  ],
+  "title": "Koinonia Assistant",
+  "type": "Link"
+ }
+]
