@@ -276,5 +276,501 @@
   ],
   "title": "Koinonia Assistant",
   "type": "Link"
+ },
+ {
+  "app": "koinonia_assistant",
+  "charts": [],
+  "content": "[{\"id\": \"hdr_Parish_Directory\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Parish Directory</b></span>\", \"col\": 12}}, {\"id\": \"c_Parishes_&_Jurisdiction\", \"type\": \"card\", \"data\": {\"card_name\": \"Parishes & Jurisdiction\", \"col\": 4}}, {\"id\": \"c_Family_&_Parishioners\", \"type\": \"card\", \"data\": {\"card_name\": \"Family & Parishioners\", \"col\": 4}}]",
+  "custom_blocks": [],
+  "docstatus": 0,
+  "doctype": "Workspace",
+  "external_link": null,
+  "for_user": null,
+  "hide_custom": 0,
+  "icon": "church",
+  "indicator_color": "green",
+  "is_hidden": 0,
+  "label": "Parish Directory",
+  "link_to": null,
+  "link_type": "DocType",
+  "links": [
+   {
+    "dependencies": null,
+    "description": null,
+    "hidden": 0,
+    "icon": null,
+    "is_query_report": 0,
+    "label": "Parishes & Jurisdiction",
+    "link_count": 3,
+    "link_to": null,
+    "link_type": "DocType",
+    "onboard": 0,
+    "only_for": null,
+    "report_ref_doctype": null,
+    "type": "Card Break"
+   },
+   {
+    "dependencies": null,
+    "description": null,
+    "hidden": 0,
+    "icon": null,
+    "is_query_report": 0,
+    "label": "Parishes",
+    "link_count": 0,
+    "link_to": "Parish",
+    "link_type": "DocType",
+    "onboard": 1,
+    "only_for": null,
+    "report_ref_doctype": null,
+    "type": "Link"
+   },
+   {
+    "dependencies": null,
+    "description": null,
+    "hidden": 0,
+    "icon": null,
+    "is_query_report": 0,
+    "label": "Vicariates",
+    "link_count": 0,
+    "link_to": "Vicariate",
+    "link_type": "DocType",
+    "onboard": 1,
+    "only_for": null,
+    "report_ref_doctype": null,
+    "type": "Link"
+   },
+   {
+    "dependencies": null,
+    "description": null,
+    "hidden": 0,
+    "icon": null,
+    "is_query_report": 0,
+    "label": "Dioceses",
+    "link_count": 0,
+    "link_to": "Diocese",
+    "link_type": "DocType",
+    "onboard": 1,
+    "only_for": null,
+    "report_ref_doctype": null,
+    "type": "Link"
+   },
+   {
+    "dependencies": null,
+    "description": null,
+    "hidden": 0,
+    "icon": null,
+    "is_query_report": 0,
+    "label": "Family & Parishioners",
+    "link_count": 2,
+    "link_to": null,
+    "link_type": "DocType",
+    "onboard": 0,
+    "only_for": null,
+    "report_ref_doctype": null,
+    "type": "Card Break"
+   },
+   {
+    "dependencies": null,
+    "description": null,
+    "hidden": 0,
+    "icon": null,
+    "is_query_report": 0,
+    "label": "Family Cards",
+    "link_count": 0,
+    "link_to": "Family",
+    "link_type": "DocType",
+    "onboard": 1,
+    "only_for": null,
+    "report_ref_doctype": null,
+    "type": "Link"
+   },
+   {
+    "dependencies": null,
+    "description": null,
+    "hidden": 0,
+    "icon": null,
+    "is_query_report": 0,
+    "label": "Parish Members",
+    "link_count": 0,
+    "link_to": "Member",
+    "link_type": "DocType",
+    "onboard": 1,
+    "only_for": null,
+    "report_ref_doctype": null,
+    "type": "Link"
+   }
+  ],
+  "modified": "2026-08-19 09:46:12.786762",
+  "module": "Koinonia Assistant",
+  "name": "Parish Directory",
+  "number_cards": [],
+  "parent_page": null,
+  "public": 1,
+  "quick_lists": [],
+  "restrict_to_domain": null,
+  "roles": [
+   {
+    "role": "Bishop"
+   },
+   {
+    "role": "Chancellor"
+   },
+   {
+    "role": "Curia"
+   },
+   {
+    "role": "Vicar General"
+   },
+   {
+    "role": "Vicar Forane"
+   },
+   {
+    "role": "Parish Priest"
+   },
+   {
+    "role": "Priest"
+   },
+   {
+    "role": "Staff"
+   },
+   {
+    "role": "Parishioner"
+   },
+   {
+    "role": "Desk User"
+   },
+   {
+    "role": "System Manager"
+   },
+   {
+    "role": "Administrator"
+   },
+   {
+    "role": "All"
+   }
+  ],
+  "sequence_id": 1.0,
+  "shortcuts": [
+   {
+    "color": "Blue",
+    "doc_view": "",
+    "format": null,
+    "icon": null,
+    "kanban_board": null,
+    "label": "Parishes",
+    "link_to": "Parish",
+    "report_ref_doctype": null,
+    "restrict_to_domain": null,
+    "stats_filter": null,
+    "type": "DocType",
+    "url": null
+   },
+   {
+    "color": "Green",
+    "doc_view": "",
+    "format": null,
+    "icon": null,
+    "kanban_board": null,
+    "label": "Family Registers",
+    "link_to": "Family",
+    "report_ref_doctype": null,
+    "restrict_to_domain": null,
+    "stats_filter": null,
+    "type": "DocType",
+    "url": null
+   },
+   {
+    "color": "Orange",
+    "doc_view": "",
+    "format": null,
+    "icon": null,
+    "kanban_board": null,
+    "label": "Parishioners Census",
+    "link_to": "Member",
+    "report_ref_doctype": null,
+    "restrict_to_domain": null,
+    "stats_filter": null,
+    "type": "DocType",
+    "url": null
+   },
+   {
+    "color": "Purple",
+    "doc_view": "",
+    "format": null,
+    "icon": null,
+    "kanban_board": null,
+    "label": "Dioceses",
+    "link_to": "Diocese",
+    "report_ref_doctype": null,
+    "restrict_to_domain": null,
+    "stats_filter": null,
+    "type": "DocType",
+    "url": null
+   },
+   {
+    "color": "Red",
+    "doc_view": "",
+    "format": null,
+    "icon": null,
+    "kanban_board": null,
+    "label": "Vicariates",
+    "link_to": "Vicariate",
+    "report_ref_doctype": null,
+    "restrict_to_domain": null,
+    "stats_filter": null,
+    "type": "DocType",
+    "url": null
+   }
+  ],
+  "title": "Parish Directory",
+  "type": "Workspace"
+ },
+ {
+  "app": "koinonia_assistant",
+  "charts": [],
+  "content": "[{\"id\": \"hdr_Sacred_Sacraments\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Sacred Sacraments</b></span>\", \"col\": 12}}, {\"id\": \"c_Sacraments_of_Initiation\", \"type\": \"card\", \"data\": {\"card_name\": \"Sacraments of Initiation\", \"col\": 4}}, {\"id\": \"c_Vocation_&_Memorial\", \"type\": \"card\", \"data\": {\"card_name\": \"Vocation & Memorial\", \"col\": 4}}]",
+  "custom_blocks": [],
+  "docstatus": 0,
+  "doctype": "Workspace",
+  "external_link": null,
+  "for_user": null,
+  "hide_custom": 0,
+  "icon": "table",
+  "indicator_color": "green",
+  "is_hidden": 0,
+  "label": "Sacred Sacraments",
+  "link_to": null,
+  "link_type": "DocType",
+  "links": [
+   {
+    "dependencies": null,
+    "description": null,
+    "hidden": 0,
+    "icon": null,
+    "is_query_report": 0,
+    "label": "Sacraments of Initiation",
+    "link_count": 3,
+    "link_to": null,
+    "link_type": "DocType",
+    "onboard": 0,
+    "only_for": null,
+    "report_ref_doctype": null,
+    "type": "Card Break"
+   },
+   {
+    "dependencies": null,
+    "description": null,
+    "hidden": 0,
+    "icon": null,
+    "is_query_report": 0,
+    "label": "Baptism Registry",
+    "link_count": 0,
+    "link_to": "Baptism",
+    "link_type": "DocType",
+    "onboard": 1,
+    "only_for": null,
+    "report_ref_doctype": null,
+    "type": "Link"
+   },
+   {
+    "dependencies": null,
+    "description": null,
+    "hidden": 0,
+    "icon": null,
+    "is_query_report": 0,
+    "label": "First Communion Registry",
+    "link_count": 0,
+    "link_to": "Communion",
+    "link_type": "DocType",
+    "onboard": 1,
+    "only_for": null,
+    "report_ref_doctype": null,
+    "type": "Link"
+   },
+   {
+    "dependencies": null,
+    "description": null,
+    "hidden": 0,
+    "icon": null,
+    "is_query_report": 0,
+    "label": "Confirmation Registry",
+    "link_count": 0,
+    "link_to": "Confirmation",
+    "link_type": "DocType",
+    "onboard": 1,
+    "only_for": null,
+    "report_ref_doctype": null,
+    "type": "Link"
+   },
+   {
+    "dependencies": null,
+    "description": null,
+    "hidden": 0,
+    "icon": null,
+    "is_query_report": 0,
+    "label": "Vocation & Memorial",
+    "link_count": 2,
+    "link_to": null,
+    "link_type": "DocType",
+    "onboard": 0,
+    "only_for": null,
+    "report_ref_doctype": null,
+    "type": "Card Break"
+   },
+   {
+    "dependencies": null,
+    "description": null,
+    "hidden": 0,
+    "icon": null,
+    "is_query_report": 0,
+    "label": "Holy Matrimony Registry",
+    "link_count": 0,
+    "link_to": "Marriage",
+    "link_type": "DocType",
+    "onboard": 1,
+    "only_for": null,
+    "report_ref_doctype": null,
+    "type": "Link"
+   },
+   {
+    "dependencies": null,
+    "description": null,
+    "hidden": 0,
+    "icon": null,
+    "is_query_report": 0,
+    "label": "Death & Burial Registry",
+    "link_count": 0,
+    "link_to": "Death",
+    "link_type": "DocType",
+    "onboard": 1,
+    "only_for": null,
+    "report_ref_doctype": null,
+    "type": "Link"
+   }
+  ],
+  "modified": "2026-08-19 09:46:13.276413",
+  "module": "Koinonia Assistant",
+  "name": "Sacred Sacraments",
+  "number_cards": [],
+  "parent_page": null,
+  "public": 1,
+  "quick_lists": [],
+  "restrict_to_domain": null,
+  "roles": [
+   {
+    "role": "Bishop"
+   },
+   {
+    "role": "Chancellor"
+   },
+   {
+    "role": "Curia"
+   },
+   {
+    "role": "Vicar General"
+   },
+   {
+    "role": "Vicar Forane"
+   },
+   {
+    "role": "Parish Priest"
+   },
+   {
+    "role": "Priest"
+   },
+   {
+    "role": "Staff"
+   },
+   {
+    "role": "Parishioner"
+   },
+   {
+    "role": "Desk User"
+   },
+   {
+    "role": "System Manager"
+   },
+   {
+    "role": "Administrator"
+   },
+   {
+    "role": "All"
+   }
+  ],
+  "sequence_id": 2.0,
+  "shortcuts": [
+   {
+    "color": "Cyan",
+    "doc_view": "",
+    "format": null,
+    "icon": null,
+    "kanban_board": null,
+    "label": "Baptisms",
+    "link_to": "Baptism",
+    "report_ref_doctype": null,
+    "restrict_to_domain": null,
+    "stats_filter": null,
+    "type": "DocType",
+    "url": null
+   },
+   {
+    "color": "Gold",
+    "doc_view": "",
+    "format": null,
+    "icon": null,
+    "kanban_board": null,
+    "label": "Holy Marriages",
+    "link_to": "Marriage",
+    "report_ref_doctype": null,
+    "restrict_to_domain": null,
+    "stats_filter": null,
+    "type": "DocType",
+    "url": null
+   },
+   {
+    "color": "Green",
+    "doc_view": "",
+    "format": null,
+    "icon": null,
+    "kanban_board": null,
+    "label": "Confirmations",
+    "link_to": "Confirmation",
+    "report_ref_doctype": null,
+    "restrict_to_domain": null,
+    "stats_filter": null,
+    "type": "DocType",
+    "url": null
+   },
+   {
+    "color": "Blue",
+    "doc_view": "",
+    "format": null,
+    "icon": null,
+    "kanban_board": null,
+    "label": "First Communions",
+    "link_to": "Communion",
+    "report_ref_doctype": null,
+    "restrict_to_domain": null,
+    "stats_filter": null,
+    "type": "DocType",
+    "url": null
+   },
+   {
+    "color": "Grey",
+    "doc_view": "",
+    "format": null,
+    "icon": null,
+    "kanban_board": null,
+    "label": "Burials & Deaths",
+    "link_to": "Death",
+    "report_ref_doctype": null,
+    "restrict_to_domain": null,
+    "stats_filter": null,
+    "type": "DocType",
+    "url": null
+   }
+  ],
+  "title": "Sacred Sacraments",
+  "type": "Workspace"
  }
 ]

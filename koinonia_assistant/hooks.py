@@ -103,7 +103,16 @@ fixtures = [
     {
         "doctype": "Workspace",
         "filters": [
-            ["name", "in", ["Koinonia Assistant"]]
+            ["name", "in", ["Koinonia Assistant", "Parish Directory", "Sacred Sacraments"]]
+        ]
+    },
+    {
+        "doctype": "Custom DocPerm",
+        "filters": [
+            ["parent", "in", [
+                "Diocese", "Vicariate", "Parish", "Family", "Member",
+                "Baptism", "Communion", "Confirmation", "Marriage", "Anointing Of Sick", "Death"
+            ]]
         ]
     }
 ]
