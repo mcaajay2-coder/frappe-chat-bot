@@ -2,7 +2,7 @@ import frappe
 import requests
 import json
 import os
-import psycopg2
+# psycopg2 imported lazily
 import re
 
 @frappe.whitelist()
@@ -99,7 +99,10 @@ def resolve_user_jurisdiction(user_email):
     if not user_email or user_email == "Guest":
         return {"user_role": "Guest", "user_diocese": "Trichy", "user_parish": None, "user_vicariate": None, "user_member_id": None, "user_parishes": [], "badge_text": "Guest", "user_name": "Guest"}
 
-    user_roles = frappe.get_roles(user_email)
+    try:
+        user_roles = frappe.get_roles(user_email)
+    except Exception:
+        user_roles = []
     user_fullname = frappe.db.get_value("User", user_email, "full_name") or frappe.db.get_value("User", user_email, "first_name") or user_email
 
     user_role = "Parishioner"
@@ -746,24 +749,36 @@ def get_parish_permission_query_conditions(user=None):
     return ""
 
 def get_generic_church_permission_conditions(doctype_table, user=None):
-    if not user:
-        user = frappe.session.user
-    if user in ["Administrator", "ajaijosem112@gmail.com"] or "System Manager" in frappe.get_roles(user):
+    try:
+        if not user:
+            user = frappe.session.user
+        if not user or user == "Guest":
+            return ""
+        user_roles = frappe.get_roles(user) if user else []
+        if user in ["Administrator", "ajaijosem112@gmail.com"] or "System Manager" in user_roles or "Administrator" in user_roles:
+            return ""
+        
+        # Check if table exists
+        doctype_name = doctype_table.replace("tab", "", 1) if doctype_table.startswith("tab") else doctype_table
+        if not frappe.db.table_exists(doctype_name):
+            return ""
+
+        j = resolve_user_jurisdiction(user)
+        role = j.get("user_role")
+        diocese = j.get("user_diocese")
+        parish = j.get("user_parish")
+        parishes = j.get("user_parishes") or []
+        
+        if role in ["Bishop", "Chancellor", "Curia"] and diocese and diocese != "All Dioceses":
+            return f"(`{doctype_table}`.`diocese_id` = {frappe.db.escape(diocese)})"
+        elif role in ["Vicar General", "Vicar Forane"] and parishes:
+            p_list = ", ".join([frappe.db.escape(p) for p in parishes])
+            return f"(`{doctype_table}`.`parish_id` IN ({p_list}))"
+        elif role == "Parish Priest" and parish:
+            return f"(`{doctype_table}`.`parish_id` = {frappe.db.escape(parish)})"
         return ""
-    j = resolve_user_jurisdiction(user)
-    role = j.get("user_role")
-    diocese = j.get("user_diocese")
-    parish = j.get("user_parish")
-    parishes = j.get("user_parishes") or []
-    
-    if role in ["Bishop", "Chancellor", "Curia"] and diocese and diocese != "All Dioceses":
-        return f"(`{doctype_table}`.`diocese_id` = {frappe.db.escape(diocese)})"
-    elif role in ["Vicar General", "Vicar Forane"] and parishes:
-        p_list = ", ".join([frappe.db.escape(p) for p in parishes])
-        return f"(`{doctype_table}`.`parish_id` IN ({p_list}))"
-    elif role == "Parish Priest" and parish:
-        return f"(`{doctype_table}`.`parish_id` = {frappe.db.escape(parish)})"
-    return ""
+    except Exception as e:
+        return ""
 
 def get_family_permission_query_conditions(user=None):
     return get_generic_church_permission_conditions("tabFamily", user)
