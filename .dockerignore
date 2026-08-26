@@ -1,0 +1,16 @@
+.git
+.github
+.vscode
+.idea
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+*.log
+.system_generated/
+*.tar
+node_modules/
+dist/
+build/
+*.egg-info
+.env
