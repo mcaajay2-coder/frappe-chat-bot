@@ -8,6 +8,27 @@ import torch
 from typing import TypedDict, Any
 from dotenv import load_dotenv
 
+# Initialize LangSmith tracing environment BEFORE importing langchain/langgraph
+dotenv_path = os.path.join(os.path.dirname(__file__), '..', '..', '..', '..', '.env')
+load_dotenv(dotenv_path)
+
+def _init_langsmith():
+    key = os.getenv("LANGCHAIN_API_KEY")
+    if not key:
+        try:
+            import frappe
+            if hasattr(frappe, "conf") and frappe.conf:
+                key = frappe.conf.get("langchain_api_key")
+        except Exception:
+            pass
+    if key:
+        os.environ["LANGCHAIN_TRACING_V2"] = "true"
+        os.environ["LANGCHAIN_ENDPOINT"] = "https://api.smith.langchain.com"
+        os.environ["LANGCHAIN_API_KEY"] = key
+        os.environ["LANGCHAIN_PROJECT"] = os.getenv("LANGCHAIN_PROJECT", "koinonia_assistant")
+
+_init_langsmith()
+
 from rank_bm25 import BM25Okapi
 from sentence_transformers import CrossEncoder
 
@@ -24,10 +45,6 @@ from langchain_core.prompts import ChatPromptTemplate
 from langgraph.graph import StateGraph, START, END
 
 MAX_RETRIES = 2
-
-# Load environment variables
-dotenv_path = os.path.join(os.path.dirname(__file__), '..', '..', '..', '..', '.env')
-load_dotenv(dotenv_path)
 
 # Initialize Groq multi-key pool
 def _get_groq_keys() -> list[str]:
@@ -1986,8 +2003,19 @@ def run_query(question: str, history: list = None, reference_text: str = None, u
         "user_email": user_email
     }
     
+    langsmith_config = {
+        "run_name": f"Koinonia_RAG_Pipeline: {question[:40]}",
+        "metadata": {
+            "user_role": user_role,
+            "user_diocese": user_diocese,
+            "user_parish": user_parish,
+            "question": question
+        },
+        "tags": [user_role, user_diocese or "Global"]
+    }
+    
     try:
-        final_state = app.invoke(initial_state)
+        final_state = app.invoke(initial_state, config=langsmith_config)
     except Exception as e:
         print(f"[run_query] Graph execution error: {e}")
         return {"reply": "Sorry, I encountered an error while processing your request.", "generated_sql": ""}
