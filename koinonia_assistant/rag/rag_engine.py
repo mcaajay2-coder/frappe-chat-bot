@@ -836,6 +836,8 @@ Assigned Vicariate: {user_vicariate}
 
 ---
 ## TABLE SELECTION RULES (pick the right table for the question):
+- MULTI-SACRAMENT / SACRAMENT COUNT / SUMMARY queries ("sacraments", "how many sacraments", "received sacraments", "sacrament count", "screments"):
+  - For family sacrament queries: `SELECT family_card_no, bapt_parish_id AS parish_name, COUNT(*) AS total_sacraments FROM tabBaptism WHERE diocese_id = '{user_diocese}' AND family_card_no IS NOT NULL AND family_card_no != '' GROUP BY family_card_no, bapt_parish_id HAVING COUNT(*) <= 3 ORDER BY total_sacraments DESC LIMIT 50`
 - BAPTISM queries ("baptized", "christened", "bapt date", "godfather", "godmother", "who baptized") → `tabBaptism`
 - COMMUNION queries ("first communion", "FHC", "holy communion", "fhc date", "fhc minister", "புது நன்மை", "புதுநன்மை", "நற்கருணை", "முதல் நற்கருணை") → `tabCommunion` (ALWAYS query tabCommunion, NEVER tabMember)
 - CONFIRMATION queries ("confirmed", "confirmation", "CNF", "cnf date", "sponsor", "cnf minister") → `tabConfirmation`
