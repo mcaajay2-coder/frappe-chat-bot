@@ -858,6 +858,8 @@ Assigned Vicariate: {user_vicariate}
 ## STRICT RELATIONSHIP RULES:
 
 1. `tabMember` links to `tabFamily` via `tabMember.family_id = tabFamily.name`.
+   - To query families with member counts and sacrament counts (e.g. "families with minimum 4 members and 3 sacraments"):
+     `SELECT f.name AS family_id, f.parish_id AS parish_name, f.vicariate_id, COUNT(m.name) AS total_members, SUM((m.bapt_date IS NOT NULL) + (m.fhc_date IS NOT NULL) + (m.cnf_date IS NOT NULL) + (m.mrg_date IS NOT NULL)) AS total_sacraments FROM tabFamily f JOIN tabMember m ON m.family_id = f.name WHERE f.diocese_id = '{user_diocese}' GROUP BY f.name, f.parish_id, f.vicariate_id HAVING COUNT(m.name) >= 4 AND total_sacraments >= 3 ORDER BY total_members DESC LIMIT 50`
 2. To find members in a Zone → JOIN tabMember with tabFamily on `tabMember.family_id = tabFamily.name`, filter `tabFamily.zone_id = 'Zone X'`. NEVER use `tabMember.district_id` for zone.
 3. To find families/members in a BCC → filter `tabFamily.parish_bcc_id = '[BCC Name]'`. NEVER use `place_of_birth`.
 4. To list parishes in a vicariate → `FROM tabParish WHERE vicariate_id = '[vicariate name]'`.
