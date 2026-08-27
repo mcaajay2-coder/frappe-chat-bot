@@ -159,11 +159,10 @@ def invoke_llm_with_rotation(prompt_messages):
         formatted_messages = prompt_messages
     
     models_to_try = [
-        "openai/gpt-oss-120b",
+        "qwen/qwen3.8-27b",
         "qwen/qwen3.6-27b",
-        "openai/gpt-oss-20b",
-        "groq/compound",
-        "groq/compound-mini"
+        "openai/gpt-oss-120b",
+        "openai/gpt-oss-20b"
     ]
     
     for model_name in models_to_try:
@@ -171,14 +170,17 @@ def invoke_llm_with_rotation(prompt_messages):
             idx = (_current_key_idx + attempt) % total_keys
             key = GROQ_API_KEYS[idx]
             try:
-                client = ChatGroq(model=model_name, temperature=0, groq_api_key=key)
+                client = ChatGroq(model=model_name, temperature=0, groq_api_key=key, max_retries=1)
                 resp = client.invoke(formatted_messages)
                 _current_key_idx = idx
                 if hasattr(resp, 'content') and isinstance(resp.content, str):
                     resp.content = re.sub(r'<think>.*?</think>', '', resp.content, flags=re.DOTALL).strip()
                 return resp
             except Exception as e:
-                print(f"[Groq Rotator] {model_name} error on key #{idx+1} ({key[:10]}...): {e}. Rotating...")
+                err_str = str(e)
+                print(f"[Groq Rotator] {model_name} error on key #{idx+1} ({key[:10]}...): {err_str[:80]}... Rotating...")
+                if "429" in err_str or "rate_limit" in err_str.lower():
+                    time.sleep(1.0)
 
     raise RuntimeError("All Groq API keys and models exhausted their rate limits.")
 
@@ -763,189 +765,54 @@ def retrieve_context_node(state: GraphState) -> GraphState:
     return {**state, "relevant_tables": relevant_tables, "relevant_fields": relevant_fields, "few_shot_examples": few_shots}
 
 SQL_GEN_PROMPT = ChatPromptTemplate.from_messages([
-    ("system", r"""You are an expert MariaDB SQL query writer for the KOINONIA Parish Assistant app.
+    ("system", r"""You are an expert MariaDB SQL writer for KOINONIA Catholic Diocesan & Parish Assistant.
 
-## Database Tables and Relationships
-You are querying a MariaDB database with the following custom tables:
+## Database Tables & Schema Context:
 {relevant_tables}
 
-## Relevant Fields (Semantically Matched Columns)
-Use these exact column names when matching user concepts:
+## Matched Columns:
 {relevant_fields}
 
 {few_shot_examples}
 
 ---
-## USER JURISDICTION & ROLE-BASED ACCESS CONTROL RULES:
-User Role: {user_role}
-Assigned Diocese: {user_diocese}
-Assigned Parish: {user_parish}
-Assigned Vicariate: {user_vicariate}
-
-### A. Global Administrator & System Manager Queries (Unrestricted Across All Dioceses):
-1. If User Role is "Administrator" or "System Manager":
-   - Full global access across all 5 dioceses (Trichy, Salem, Chennai, Vellore, Coimbatore) and all 20 parishes.
-   - Do NOT inject any diocese or parish filter unless the user explicitly names one in their question.
-   - "Total members" / "Total members across all dioceses" → `SELECT COUNT(*) AS total_members FROM tabMember`
-   - "List all parishes" → `SELECT name AS parish_name, diocese_id, patron_saint, parish_priest, city FROM tabParish`
-   - "Count members in each diocese" → `SELECT diocese_id, COUNT(*) AS total_members FROM tabMember GROUP BY diocese_id ORDER BY total_members DESC`
-   - "Total families" / "Show families" → `SELECT parish_id AS parish_name, COUNT(*) AS total_families FROM tabFamily GROUP BY parish_id ORDER BY total_families DESC`
-   - "Show total counts of all sacraments" → `SELECT 'Baptism' AS sacrament_name, COUNT(*) AS total_count FROM tabBaptism UNION ALL SELECT 'First Holy Communion' AS sacrament_name, COUNT(*) AS total_count FROM tabCommunion UNION ALL SELECT 'Confirmation' AS sacrament_name, COUNT(*) AS total_count FROM tabConfirmation UNION ALL SELECT 'Marriage' AS sacrament_name, COUNT(*) AS total_count FROM tabMarriage UNION ALL SELECT 'Death' AS sacrament_name, COUNT(*) AS total_count FROM tabDeath UNION ALL SELECT 'Anointing Of Sick' AS sacrament_name, COUNT(*) AS total_count FROM \`tabAnointing Of Sick\``
-
-### B. Diocesan & Parish Queries (Permitted for ALL Roles in their Diocese):
-1. Questions about `tabParish`, `tabDiocese`, `tabVicariate` (such as parish directory, church history, patron saint, feast days, parish priest, assistant priest, bishop name):
-   - Scope to `{user_diocese}`:
-     - "How many parishes in my diocese?" → `SELECT COUNT(*) FROM tabParish WHERE diocese_id = '{user_diocese}'`
-     - "List parishes in my diocese" → `SELECT name AS parish_name, patron_saint, feast_day, parish_priest, city FROM tabParish WHERE diocese_id = '{user_diocese}'`
-     - "How many vicar generals in my diocese?" / "How many vicariates?" → `SELECT COUNT(DISTINCT vicariate_id) AS total_vicariates FROM tabParish WHERE diocese_id = '{user_diocese}' AND vicariate_id IS NOT NULL`
-     - "List vicar generals / vicariates in my diocese" → `SELECT DISTINCT vicariate_id AS vicariate_name, diocese_id FROM tabParish WHERE diocese_id = '{user_diocese}' AND vicariate_id IS NOT NULL`
-     - "Tell me about my parish" / "History of my parish" → `SELECT name AS parish_name, patron_saint, feast_day, established_date, parish_priest, assistant_priest, city, note FROM tabParish WHERE name = '{user_parish}'`
-     - "Tell me about [Parish Name]" → `SELECT name AS parish_name, patron_saint, feast_day, established_date, parish_priest, assistant_priest, city, note FROM tabParish WHERE name = '[Parish Name]' AND diocese_id = '{user_diocese}'`
-     - "Tell me about my diocese" → `SELECT diocese_name, bishop_name, established_date, city, phone, email, note FROM tabDiocese WHERE name = '{user_diocese}'`
-
-### B. Personal Parishioner & Sacrament Data (Strictly Role-Restricted):
-2. If User Role is "Bishop", "Curia", "Vicar General", "Chancellor", "Administrator":
-   - Full access strictly to records within their own assigned diocese (`{user_diocese}`).
-   - If user asks for counts, gender breakdown, living status, sacraments, or general members (even if phrased "in my parish" or "in my diocese"):
-     -> Scope with `WHERE diocese_id = '{user_diocese}'`.
-     -> If grouping by gender: `SELECT gender, COUNT(*) AS total_members FROM tabMember WHERE diocese_id = '{user_diocese}' GROUP BY gender ORDER BY total_members DESC`.
-     -> If grouping by living status: `SELECT living_status, COUNT(*) AS total_members FROM tabMember WHERE diocese_id = '{user_diocese}' GROUP BY living_status ORDER BY total_members DESC`.
-     -> NEVER leave `parish_id = ''` or `parish_id = '{user_diocese}'` because `{user_diocese}` is a Diocese, not a Parish!
-   - If user asks "in my parish" / "in my diocese" / "how many families" / "show families" without naming a single specific parish:
-     -> Return parish-wise breakdown: `SELECT parish_id AS parish_name, COUNT(*) AS total_families FROM tabFamily WHERE diocese_id = '{user_diocese}' GROUP BY parish_id ORDER BY total_families DESC`.
-   - If user names a specific parish within their diocese (e.g. "families in Christ the King Parish"):
-     -> Filter `WHERE parish_id = 'Christ the King Parish' AND diocese_id = '{user_diocese}'`.
-   - If user explicitly requests data or counts for ANOTHER diocese (e.g. asking for "Salem diocese", "Chennai diocese", "Vellore diocese", "Coimbatore diocese", etc.) that is NOT `{user_diocese}`:
-     -> Return raw string: `UNAUTHORIZED_DIOCESE`.
-3. If User Role is "Vicar Forane":
-   - Restrict member and sacrament queries to their vicariate: `WHERE vicariate_id = '{user_vicariate}'`.
-   - If user asks for member records across the entire diocese or other vicariates -> Return raw string: `UNAUTHORIZED_DIOCESE`.
-4. If User Role is "Parish Priest":
-   - If user asks for member/sacrament records across "ALL PARISHES", "ENTIRE DIOCESE", or "OTHER PARISHES" -> Return raw string: `UNAUTHORIZED_DIOCESE`.
-   - Otherwise, ALWAYS filter personal tables strictly by their assigned parish (`{user_parish}`):
-     - `bapt_parish_id = '{user_parish}'` (for tabBaptism)
-     - `mrg_parish_id = '{user_parish}'` (for tabMarriage)
-     - `cnf_parish_id = '{user_parish}'` (for tabConfirmation)
-     - `fhc_parish_id = '{user_parish}'` (for tabCommunion)
-     - `death_parish_id = '{user_parish}'` (for tabDeath)
-     - `anointing_parish_id = '{user_parish}'` (for tabAnointing Of Sick)
-     - `parish_id = '{user_parish}'` (for tabFamily / tabMember)
-5. If User Role is "Parishioner":
-   - Restrict personal tables strictly to their assigned parish (`parish_id = '{user_parish}'`).
-   - If asking for other parishes -> Return raw string: `UNAUTHORIZED_DIOCESE`.
+## JURISDICTION & ROLE SCOPE (Role: {user_role}, Diocese: {user_diocese}, Parish: {user_parish}, Vicariate: {user_vicariate}):
+1. Admin / System Manager: Global access across all dioceses.
+2. Bishop / Curia / Chancellor / Vicar General: Scope queries to `WHERE diocese_id = '{user_diocese}'`. If foreign diocese requested -> Return `UNAUTHORIZED_DIOCESE`.
+3. Vicar Forane: Scope member/sacrament queries to `WHERE vicariate_id = '{user_vicariate}'`.
+4. Parish Priest / Parishioner: Scope personal tables strictly to assigned parish (`bapt_parish_id = '{user_parish}'`, `fhc_parish_id = '{user_parish}'`, `cnf_parish_id = '{user_parish}'`, `mrg_parish_id = '{user_parish}'`, `death_parish_id = '{user_parish}'`, `parish_id = '{user_parish}'`). If other parishes requested -> Return `UNAUTHORIZED_DIOCESE`.
 
 ---
-## TABLE SELECTION RULES (pick the right table for the question):
-- MULTI-SACRAMENT / SACRAMENT COUNT / SUMMARY queries ("sacraments", "how many sacraments", "received sacraments", "sacrament count", "screments"):
-  - For family sacrament queries: `SELECT family_card_no, bapt_parish_id AS parish_name, COUNT(*) AS total_sacraments FROM tabBaptism WHERE diocese_id = '{user_diocese}' AND family_card_no IS NOT NULL AND family_card_no != '' GROUP BY family_card_no, bapt_parish_id HAVING COUNT(*) <= 3 ORDER BY total_sacraments DESC LIMIT 50`
-- BAPTISM queries ("baptized", "christened", "bapt date", "godfather", "godmother", "who baptized") → `tabBaptism`
-- COMMUNION queries ("first communion", "FHC", "holy communion", "fhc date", "fhc minister", "புது நன்மை", "புதுநன்மை", "நற்கருணை", "முதல் நற்கருணை") → `tabCommunion` (ALWAYS query tabCommunion, NEVER tabMember)
-- CONFIRMATION queries ("confirmed", "confirmation", "CNF", "cnf date", "sponsor", "cnf minister") → `tabConfirmation`
-- MARRIAGE queries ("married", "wedding", "bride", "bridegroom", "groom", "solemnized", "mrg date", "திருமணம்", "கல்யாணம்"):
-  - When searching for a person's marriage by name (e.g. "Clinton", "Thomas", "Maria"): ALWAYS search bridegroom and bride columns:
-    `WHERE (bridegroom_name LIKE '%Clinton%' OR bridegroom_last_name LIKE '%Clinton%' OR bride_name LIKE '%Clinton%' OR bride_last_name LIKE '%Clinton%')`
-  - Select: `SELECT bridegroom_name, bridegroom_middle_name, bridegroom_last_name, bride_name, bride_middle_name, bride_last_name, mrg_date, mrg_parish_id AS parish_name FROM tabMarriage`
-  - Example: "Find marriage records for Clinton" -> `SELECT bridegroom_name, bridegroom_last_name, bride_name, bride_last_name, mrg_date, mrg_parish_id AS parish_name FROM tabMarriage WHERE diocese_id = '{user_diocese}' AND (bridegroom_name LIKE '%Clinton%' OR bridegroom_last_name LIKE '%Clinton%' OR bride_name LIKE '%Clinton%' OR bride_last_name LIKE '%Clinton%')`
-- DEATH/BURIAL queries ("died", "death", "passed away", "buried", "burial", "deceased", "funeral", "cemetery", "last rites", "இறந்தார்கள்", "இறப்பு") → `tabDeath` (select first_name, middle_name, last_name, death_date, parish_id AS parish_name)
-- ANOINTING queries ("anointing", "anointed", "sick anointing", "extreme unction") → `tabAnointing Of Sick` (always backtick-quote: \`tabAnointing Of Sick\`)
-- MEMBER queries ("member", "parishioner", "person details", "blood group", "occupation", "education", "marital status", "living status", "who is [name]") → `tabMember`
-- FAMILY queries ("family", "household", "family card", "BCC", "zone", "economic status", "income", "house type", "family register") → `tabFamily`
-- DIOCESE queries ("diocese", "bishop", "ordinary", "diocesan", "established diocese") → `tabDiocese`
-- VICARIATE queries ("vicariate", "deanery", "vicar forane", "dean", "forane") → `tabVicariate`
-- PARISH queries ("parish", "church", "patron saint", "feast day", "parish priest", "assistant priest") → `tabParish`
+## TABLE SELECTION & CANONICAL RULES:
+- BAPTISM ("baptized", "godfather", "godmother", "who baptized") → `tabBaptism`
+- COMMUNION ("first communion", "FHC", "புது நன்மை", "புதுநன்மை", "முதல் நற்கருணை", "நற்கருணை") → `tabCommunion`
+- CONFIRMATION ("confirmation", "CNF", "confirmed", "sponsor", "உறுதிப்பூசுதல்") → `tabConfirmation`
+- MARRIAGE ("marriage", "wedding", "groom", "bride", "திருமணம்", "கல்யாணம்") → `tabMarriage` (Search both `bridegroom_name` and `bride_name`).
+- DEATH / BURIAL ("died", "death", "buried", "cemetery", "இறப்பு", "அடக்கம்") → `tabDeath`
+- ANOINTING ("anointing", "sick anointing", "நோய் பூசுதல்", "தைலம்") → `tabAnointing Of Sick` (Backtick quote table name).
+- MEMBER ("member", "parishioner", "blood group", "occupation", "age", "marital status", "who is") → `tabMember`
+- FAMILY ("family", "household", "family card", "BCC", "zone", "head of family") → `tabFamily`
+- PARISH DIRECTORY ("parish", "patron saint", "feast day", "parish priest") → `tabParish` (WHERE diocese_id = '{user_diocese}')
+- DIOCESE PROFILE ("diocese history", "bishop of diocese", "chancery") → `tabDiocese`
+- VICARIATE ("vicariates", "deaneries", "vicar forane") → `tabVicariate`
 
 ---
-## STRICT RELATIONSHIP RULES:
-
-1. `tabMember` links to `tabFamily` via `tabMember.family_id = tabFamily.name`.
-   - To query families with member counts and sacrament counts (e.g. "families with minimum 4 members and 3 sacraments"):
-     `SELECT f.name AS family_id, f.parish_id AS parish_name, f.vicariate_id, COUNT(m.name) AS total_members, SUM((m.bapt_date IS NOT NULL) + (m.fhc_date IS NOT NULL) + (m.cnf_date IS NOT NULL) + (m.mrg_date IS NOT NULL)) AS total_sacraments FROM tabFamily f JOIN tabMember m ON m.family_id = f.name WHERE f.diocese_id = '{user_diocese}' GROUP BY f.name, f.parish_id, f.vicariate_id HAVING COUNT(m.name) >= 4 AND total_sacraments >= 3 ORDER BY total_members DESC LIMIT 50`
-2. To find members in a Zone → JOIN tabMember with tabFamily on `tabMember.family_id = tabFamily.name`, filter `tabFamily.zone_id = 'Zone X'`. NEVER use `tabMember.district_id` for zone.
-3. To find families/members in a BCC → filter `tabFamily.parish_bcc_id = '[BCC Name]'`. NEVER use `place_of_birth`.
-4. To list parishes in a vicariate → `FROM tabParish WHERE vicariate_id = '[vicariate name]'`.
-5. To list vicariates/parishes in a diocese → filter `diocese_id = '[diocese name]'`.
-6. **CRITICAL — NO JOINS ON SACRAMENT TABLES**: NEVER JOIN `tabMember` or `tabFamily` with sacrament tables (`tabBaptism`, `tabCommunion`, `tabConfirmation`, `tabMarriage`, `tabAnointing Of Sick`, `tabDeath`). ALWAYS query sacrament tables DIRECTLY. They already contain first_name, last_name, father_name, mother_name, and gender. If the user asks for a chart or count by male/female, simply use `SELECT gender, COUNT(*) FROM [table_name] GROUP BY gender`.
-7. Primary key column in all Frappe tables is `name` (NOT `id`).
-8. NEVER use `parish_priest` to filter by Parish name. `parish_priest` stores the PRIEST'S NAME. Use `bapt_parish_id`, `mrg_parish_id`, `cnf_parish_id`, `fhc_parish_id`, `death_parish_id`, or `parish_id` to filter by parish name.
+## SPECIFIC PERSON & DETAIL LOOKUP RULES:
+- When user asks for "all details", "details about [Person]", "sacrament record", or searches a specific person by name:
+  - For tabBaptism: `SELECT name, bapt_register_ref, first_name, middle_name, last_name, gender, dob, birth_place, bapt_date, bapt_place, bapt_parish_id AS parish_name, diocese_id, father_name, father_occupation, mother_name, mother_occupation, bapt_god_father, bapt_god_father_last_name, bapt_god_mother, bapt_god_mother_last_name, bapt_minister, parish_priest, family_card_no, note FROM tabBaptism WHERE diocese_id = '{user_diocese}' AND (CONCAT_WS(' ', first_name, NULLIF(middle_name, ''), last_name) LIKE '%Carmel%Maria%' OR (first_name LIKE '%Carmel%' AND middle_name LIKE '%Maria%')) LIMIT 1`
+  - For tabCommunion: `SELECT name, first_name, middle_name, last_name, gender, dob, fhc_date, fhc_place, fhc_parish_id AS parish_name, diocese_id, father_name, mother_name, fhc_minister, parish_priest, family_card_no, note FROM tabCommunion WHERE diocese_id = '{user_diocese}' AND (first_name LIKE '%[Name]%' OR middle_name LIKE '%[Name]%' OR last_name LIKE '%[Name]%') LIMIT 1`
+  - For tabConfirmation: `SELECT name, first_name, middle_name, last_name, gender, dob, cnf_date, cnf_place, cnf_parish_id AS parish_name, diocese_id, father_name, mother_name, cnf_minister, sponsor_name, parish_priest, family_card_no, note FROM tabConfirmation WHERE diocese_id = '{user_diocese}' AND (first_name LIKE '%[Name]%' OR middle_name LIKE '%[Name]%' OR last_name LIKE '%[Name]%') LIMIT 1`
+  - For tabMarriage: `SELECT name, bridegroom_name, bridegroom_middle_name, bridegroom_last_name, bride_name, bride_middle_name, bride_last_name, mrg_date, mrg_place, mrg_parish_id AS parish_name, diocese_id, mrg_minister, witness1_name, witness2_name, note FROM tabMarriage WHERE diocese_id = '{user_diocese}' AND (bridegroom_name LIKE '%[Name]%' OR bride_name LIKE '%[Name]%') LIMIT 1`
+  - For tabMember: `SELECT name, first_name, middle_name, last_name, gender, dob, age, marital_status_id, blood_group_id, occupation, education, mobile, email, street, city, parish_id AS parish_name, vicariate_id, diocese_id, family_id, is_family_head, living_status, bapt_date, fhc_date, cnf_date, mrg_date FROM tabMember WHERE diocese_id = '{user_diocese}' AND (first_name LIKE '%[Name]%' OR last_name LIKE '%[Name]%') LIMIT 1`
 
 ---
-## DATE / YEAR RULES:
-
-9. For a specific year ("in 2023", "during 2020", "2024 baptisms") → `WHERE YEAR([date_col]) = 2023`. **CRITICAL: NEVER replace a specific 4-digit year like 2024 with YEAR(CURDATE()), because the system clock might be in a different year (e.g. 2026). Always use the literal number.**
-10. For "this year" / "current year" (without specifying the number) → `WHERE YEAR([date_col]) = YEAR(CURDATE())`.
-11. For "this month" / "entered this month" / "added this month" → ALWAYS filter on the relevant sacrament/record date: `WHERE MONTH([date_col]) = MONTH(CURDATE()) AND YEAR([date_col]) = YEAR(CURDATE())` (e.g. `MONTH(bapt_date) = MONTH(CURDATE()) AND YEAR(bapt_date) = YEAR(CURDATE())` for tabBaptism).
-12. For a specific month ("in January 2024", "March baptisms") → `WHERE MONTH([date_col]) = 1 AND YEAR([date_col]) = 2024`.
-13. For date range ("between 2020 and 2023", "from 2018 to 2022") → `WHERE [date_col] BETWEEN '2020-01-01' AND '2023-12-31'`.
-14. For recent records ("last 6 months", "recent", "past year") → `WHERE [date_col] >= DATE_SUB(CURDATE(), INTERVAL 6 MONTH)`.
-
----
-## COUNT vs LIST RULES:
-
-15. Count-only ("how many", "count", "total number of") → `SELECT COUNT(*) FROM ...` — no other columns unless GROUP BY is present. **SPECIAL FOR BISHOP**: When User Role is "Bishop" and the question asks "how many families/members in my diocese" or "how many families/members in my parish" (without specifying a single parish name), ALWAYS return the parish-wise breakdown table: `SELECT parish_id AS parish_name, COUNT(*) AS total_families FROM tabFamily WHERE diocese_id = '{user_diocese}' GROUP BY parish_id ORDER BY total_families DESC`.
-16. List / Show Records queries ("show", "list", "display", "find", "give me", "who are", "show records", "list records", "show baptism records", "show marriage records", "details") → ALWAYS select human-readable row columns (e.g. for tabBaptism: `SELECT first_name, middle_name, last_name, bapt_date, father_name, mother_name FROM tabBaptism WHERE ... LIMIT 50`). **CRITICAL: NEVER use COUNT(*) when the user asks to "show records", "list records", or "get details" — you MUST return the actual list of rows/persons.**
-17. Grouped count ("by parish", "per zone", "breakdown by BCC", "parish-wise count", "statistics by year") → `SELECT [group_col], COUNT(*) FROM ... GROUP BY [group_col] ORDER BY COUNT(*) DESC`. **CRITICAL FOR PARISH BREAKDOWNS:** When grouping by `parish_id` or `bapt_parish_id`, ALWAYS include `parish_id IS NOT NULL AND parish_id != ''` in the WHERE clause so unassigned/NULL parish records do not produce an empty '-' row in the parish list table.
-18. "How many AND list them" → return just the list (individual columns, no COUNT(*)).
-19. Chart/plot queries ("bar chart", "pie chart", "plot", "trend", "graph") → `SELECT [label_col], COUNT(*) AS count FROM ... GROUP BY [label_col] ORDER BY [label_col]`. **CRITICAL FOR CHARTS:** You MUST return exactly TWO columns: one label column and one numeric count column. NEVER return pivoted conditional counts (like `COUNT(CASE WHEN gender='Male')`). For gender charts, ALWAYS use `SELECT gender, COUNT(*) FROM tabBaptism GROUP BY gender`.
-20. MULTI-METRIC / COMPOUND QUESTIONS ("how many parishes, how many members, and how many vicariates?", "total parishes + total members + total vicars"):
-    - NEVER write multiple SELECT statements separated by semicolons (`;`), as MariaDB only executes a single statement.
-    - ALWAYS combine multi-count questions into a SINGLE query using `UNION ALL` or scalar subqueries, for example:
-      `SELECT 'Total Parishes' AS metric, COUNT(*) AS count FROM tabParish WHERE enabled = 1 UNION ALL SELECT 'Total Members' AS metric, COUNT(*) AS count FROM tabMember UNION ALL SELECT 'Total Vicariates' AS metric, COUNT(DISTINCT vicariate_id) AS count FROM tabParish WHERE vicariate_id IS NOT NULL AND vicariate_id != ''`
-      OR
-      `SELECT (SELECT COUNT(*) FROM tabParish WHERE enabled = 1) AS total_parishes, (SELECT COUNT(*) FROM tabMember) AS total_members, (SELECT COUNT(DISTINCT vicariate_id) FROM tabParish WHERE vicariate_id IS NOT NULL AND vicariate_id != '') AS total_vicariates`
-
----
-## FILTERING RULES:
-
-20. By minister/priest name ("baptisms by Fr. Thomas", "burial by [minister]") → `WHERE bapt_minister LIKE '%Thomas%'` (use LIKE for partial name matching).
-21. By godfather/godmother/sponsor → `WHERE bapt_god_father LIKE '%[name]%'` (baptism), `cnf_god_father` (confirmation), `sponsor` (confirmation), `witness1_name` / `witness2_name` (marriage).
-22. By gender ("female members", "boys baptized", "girls confirmed") → `WHERE gender = 'Female'` or `WHERE gender = 'Male'`.
-23. By living status ("alive", "deceased members") → `WHERE living_status = 'Alive'` or `WHERE living_status = 'Deceased'` in tabMember.
-24. By person's name ("details of Paul Amalraj S.", "find Paul Amalraj", "tell me about Thomas D'Souza", "Nirmala Fernando G.") → Note: first_name is given name (e.g. Paul), middle_name is family/father name (e.g. Amalraj), last_name is initial (e.g. S.). Search using exact full-name matching: `WHERE CONCAT_WS(' ', first_name, NULLIF(middle_name, ''), last_name) LIKE '%[first]%[middle/surname]%' OR (first_name = '[first]' AND middle_name = '[middle/surname]')`. Do NOT use loose `OR first_name LIKE '%[first]%'` without surname when a surname was given, to avoid returning unrelated people with the same first name. For single name search with only one word ("Celine"), use `WHERE (first_name = 'Celine' OR middle_name = 'Celine' OR last_name = 'Celine')`.
-25. By family card number → `WHERE family_card_no = '[card_no]'` (exists in all sacrament tables) or `family_register_number` (tabFamily).
-26. By Diocese/Vicariate scope ("families in Vellore diocese", "records in Chennai vicariate") → filter `diocese_id = '[diocese name]'` or `vicariate_id = '[vicariate name]'`. These columns exist in tabFamily, tabMember, tabBaptism, tabConfirmation, tabCommunion, tabMarriage, tabDeath.
-27. By marital status ("single members", "widowed members") → `WHERE marital_status_id = 'Single'` in tabMember; `WHERE marital_status = 'Widowed'` in tabDeath.
-28. By occupation ("teachers in parish", "farmers", "members who are doctors") → `WHERE occupation LIKE '%teacher%'` in tabMember.
-29. By economic status ("poor families", "affluent households", "below poverty line") → `WHERE economic_status LIKE '%Poor%'` in tabFamily.
-30. By cause of death ("died of cancer", "accidents", "old age") → `WHERE death_cause LIKE '%cancer%'` in tabDeath.
-31. By cemetery ("buried in St. Joseph cemetery") → `WHERE cemetery_code LIKE '%St. Joseph%'` in tabDeath.
-32. Register reference ("baptism register ref ABC-001", "marriage register no") → `WHERE bapt_register_ref = 'ABC-001'` (tabBaptism), `mrg_register_ref` (tabMarriage), `cnf_register_ref` (tabConfirmation), `fhc_register_ref` (tabCommunion), `death_register_ref` (tabDeath).
-33. Patron saint queries ("parishes with patron saint Mary", "feast day in January") → `WHERE patron_saint LIKE '%Mary%'` or `WHERE MONTH(feast_day) = 1` in tabParish.
-34. Active/inactive records ("active parishes", "inactive families") → `WHERE active = 1` (active) or `WHERE active = 0` (inactive).
-35. Family head ("head of family", "who is the family head") → `WHERE is_family_head = 'Yes'` in tabMember.
-36. Bride/groom religion ("inter-religion marriages", "non-Catholic groom") → `WHERE bridegroom_religion_id != 'Catholic'` or `bride_religion_id` in tabMarriage.
-37. Members who completed multiple sacraments ("members who completed baptism and communion and confirmation", "fully initiated members", "married members with all sacraments") → Query `tabMember` directly using `WHERE bapt_date IS NOT NULL AND fhc_date IS NOT NULL AND cnf_date IS NOT NULL` (and add `AND marital_status_id = 'Married'` if marriage is mentioned). NEVER try to JOIN all 4 sacrament tables together.
-38. Person / Member lookups ("tell me about [name]", "who is [name]", "find [name]", "search [name]", "telll me about [name]") → Check `tabMember` (e.g. `SELECT first_name, middle_name, last_name, dob, gender, living_status, parish_id, mobile FROM tabMember WHERE CONCAT_WS(' ', first_name, NULLIF(middle_name, ''), last_name) LIKE '%[first]%[last]%' OR (first_name = '[first]' AND middle_name = '[last]')`) or sacrament table if sacrament is mentioned.
-39. Names with apostrophes (e.g. D'Souza, O'Connor, St. Mary's) → Always escape single quotes in SQL string literals: `middle_name = 'D\\\'Souza'` or `last_name = 'D\\\'Souza'` or `LIKE '%Souza%'`.
-40. Family details of a person / family members:
-    - To list all family members of a family ID → `SELECT m.first_name, m.middle_name, m.last_name, m.relationship_id, m.gender, m.age, m.living_status FROM tabMember m WHERE m.family_id = '[family_id]'`
-    - To find family of a person → `SELECT m.first_name, m.middle_name, m.last_name, m.relationship_id, m.gender, m.age, m.living_status, f.parish_bcc_id, f.zone_id, f.family_register_number FROM tabMember m LEFT JOIN tabFamily f ON m.family_id = f.name WHERE m.family_id = (SELECT family_id FROM tabMember WHERE CONCAT_WS(' ', first_name, NULLIF(middle_name, ''), last_name) LIKE '%[first]%[middle/surname]%' OR (first_name = '[first]' AND middle_name = '[middle/surname]') LIMIT 1) OR (CONCAT_WS(' ', m.first_name, NULLIF(m.middle_name, ''), m.last_name) LIKE '%[first]%[middle/surname]%')`. NEVER join `tabBaptism` or other sacrament tables for family lookups!
-41. Wildcards in SELECT: NEVER use `SELECT *`, `SELECT T1.*`, or `SELECT T2.*`. Always explicitly select up to 5 specific column names (e.g. `SELECT m.first_name, m.middle_name, m.last_name, f.parish_bcc_id, f.zone_id`).
-42. Relationship between two persons ("how is [Name 1] related to [Name 2]?", "relationship between [Name 1] and [Name 2]", "is [Name 1] related to [Name 2]?", "which parish they belongs to?"):
-    - Always query: `SELECT CONCAT_WS(' ', m1.first_name, NULLIF(m1.middle_name, ''), m1.last_name) AS person1_fullname, m1.relationship_id AS relationship1, m1.parish_id AS parish_name, CONCAT_WS(' ', m2.first_name, NULLIF(m2.middle_name, ''), m2.last_name) AS person2_fullname, m2.relationship_id AS relationship2, m1.family_id, m1.diocese_id FROM tabMember m1 JOIN tabMember m2 ON m1.family_id = m2.family_id WHERE (CONCAT_WS(' ', m1.first_name, NULLIF(m1.middle_name, ''), m1.last_name) LIKE '%[first1]%' OR (m1.first_name LIKE '%[first1]%' AND (m1.middle_name LIKE '%[last1]%' OR m1.last_name LIKE '%[last1]%'))) AND (CONCAT_WS(' ', m2.first_name, NULLIF(m2.middle_name, ''), m2.last_name) LIKE '%[first2]%' OR (m2.first_name LIKE '%[first2]%' AND (m2.middle_name LIKE '%[last2]%' OR m2.last_name LIKE '%[last2]%'))) LIMIT 1`.
-43. Diocese Profile & History for a SINGLE diocese ("tell about [Diocese] diocese", "tell about Tiruchy diocese", "about Salem diocese", "diocese history", "who is the bishop of [Diocese]", "chancery details"):
-    - Always query `tabDiocese`: `SELECT diocese_name, bishop_name, established_date, city, phone, email, website, note FROM tabDiocese WHERE (name LIKE '%[diocese]%' OR diocese_name LIKE '%[diocese]%' OR SOUNDEX(name) = SOUNDEX('[diocese]')) LIMIT 1`. Note: In tabDiocese, primary key name is 'Trichy', 'Salem', 'Chennai', 'Vellore', 'Coimbatore'.
-48. Listing all Dioceses ("list all dioceses", "list them" when following a diocese query, "show all dioceses", "what are the dioceses", "names of all dioceses", "list dioceses"):
-    - Always query `tabDiocese`: `SELECT diocese_name, bishop_name, established_date, city, phone, email FROM tabDiocese ORDER BY diocese_name ASC`. NEVER put `LIMIT 1` or single diocese filter when asked to list all dioceses!
-44. Vicar General & Vicar Forane controlled parishes queries ("what are my controlled parishes", "list parishes in my vicariate", "parishes under my administration", "my vicariate parishes"):
-    - Always query `tabParish`: `SELECT name AS parish_name, city, patron_saint, parish_priest, established_date FROM tabParish WHERE (vicariate_id = '{user_vicariate}' OR diocese_id = '{user_diocese}') LIMIT 50`.
-47. Pagination & Next Records queries ("show next 50 records", "next records", "next page", "show remaining records", "page 2", "show next batch"):
-    - Identify the base SELECT query from the enhanced context and append or update `LIMIT 50 OFFSET 50` (or `OFFSET 100` for page 3).
-    - Example: `SELECT m.first_name, m.last_name, m.gender, m.age FROM tabMember WHERE diocese_id = '{user_diocese}' LIMIT 50 OFFSET 50`.
-45. Multi-Sacrament Counts / Summary ("count of each sacrament", "sacrament summary", "sacrament statistics", "add the sacraments name", "breakdown by sacrament", "sacrament counts"):
-    - Always use UNION ALL with explicit sacrament names:
-      `SELECT 'Baptism' AS sacrament_name, COUNT(*) AS total_count FROM tabBaptism WHERE (bapt_parish_id = '{user_parish}' OR diocese_id = '{user_diocese}') UNION ALL SELECT 'First Holy Communion' AS sacrament_name, COUNT(*) AS total_count FROM tabCommunion WHERE (fhc_parish_id = '{user_parish}' OR diocese_id = '{user_diocese}') UNION ALL SELECT 'Confirmation' AS sacrament_name, COUNT(*) AS total_count FROM tabConfirmation WHERE (cnf_parish_id = '{user_parish}' OR diocese_id = '{user_diocese}') UNION ALL SELECT 'Marriage' AS sacrament_name, COUNT(*) AS total_count FROM tabMarriage WHERE (mrg_parish_id = '{user_parish}' OR diocese_id = '{user_diocese}') UNION ALL SELECT 'Death' AS sacrament_name, COUNT(*) AS total_count FROM tabDeath WHERE (death_parish_id = '{user_parish}' OR diocese_id = '{user_diocese}') UNION ALL SELECT 'Anointing Of Sick' AS sacrament_name, COUNT(*) AS total_count FROM `tabAnointing Of Sick` WHERE (anointing_parish_id = '{user_parish}' OR diocese_id = '{user_diocese}')`
-
----
-## QUERY GENERATION RULES:
-- ONLY write SELECT queries. NEVER write INSERT, UPDATE, DELETE, or ALTER queries.
-- NEVER use `SELECT *` or unhelpful system columns (name, creation, modified, modified_by, owner, docstatus, idx, amended_from, _user_tags, _comments, _assign, _liked_by, custom).
-- Select a MAXIMUM of 5-6 columns that directly answer the query.
-- When querying sacrament or member registers (e.g. Baptism, Communion, Confirmation, Marriage, Death, Anointing, Member), ALWAYS include the candidate/person name (first_name, last_name, or bridegroom_name, bride_name) and the sacrament date (bapt_date, mrg_date, fhc_date, cnf_date, death_date) in the SELECT list, alongside requested fields (such as father_name, mother_name, minister).
-- Return all matching records for the query.
-- Do NOT guess or invent column names. Only use columns from the schemas above.
-- Do NOT wrap SQL in markdown or code blocks. Return only the raw SQL string.
-- If the question cannot be answered with these tables, return "UNSUPPORTED".
-"""),
+## STRICT QUERY SYNTAX RULES:
+1. Output ONLY a single executable MariaDB SELECT query inside ```sql ... ``` code block.
+2. NEVER use `SELECT *` or system metadata columns (amended_from, _user_tags, creation, modified, idx, docstatus).
+3. Specific 4-digit years (e.g. 2024, 2025): Use literal `WHERE YEAR([date_col]) = 2024`.
+4. Multi-sacrament family aggregation (e.g. "families with minimum 4 members and 3 sacraments"):
+   `SELECT f.name AS family_id, f.parish_id AS parish_name, f.vicariate_id, COUNT(m.name) AS total_members, SUM((m.bapt_date IS NOT NULL) + (m.fhc_date IS NOT NULL) + (m.cnf_date IS NOT NULL) + (m.mrg_date IS NOT NULL)) AS total_sacraments FROM tabFamily f JOIN tabMember m ON m.family_id = f.name WHERE f.diocese_id = '{user_diocese}' GROUP BY f.name, f.parish_id, f.vicariate_id HAVING COUNT(m.name) >= 4 AND total_sacraments >= 3 ORDER BY total_members DESC LIMIT 50`
+5. Grouped Counts / Charts: Return exactly 2 columns (label column and numeric count column, e.g. `SELECT gender, COUNT(*) FROM tabMember GROUP BY gender`)."""),
     ("human", "User question: {enhanced_query}"),
 ])
 
@@ -1109,6 +976,10 @@ def sanitize_select_clause(sql: str, question: str = "") -> str:
         select_part = sql_upper.split("FROM")[0].replace("SELECT", "").strip()
         selected_cols = [c.strip().strip('`') for c in select_part.split(",") if c.strip()]
         
+        # If the query is looking up a single document or specific person details, preserve all columns
+        if "LIMIT 1" in sql_upper or any(c.lower() in ["name", "bapt_register_ref", "fhc_register_ref", "cnf_register_ref", "mrg_register_ref", "death_register_ref"] for c in selected_cols):
+            return sql
+
         is_wildcard = "*" in select_part
         max_allowed = 8 if table_name in ["tabParish", "tabDiocese"] else 5
         has_too_many = len(selected_cols) > max_allowed
@@ -1649,8 +1520,10 @@ def format_response_node(state: GraphState) -> GraphState:
                     ans += f"• **Diocese:** {dio} Diocese\n"
                 return {**state, "final_answer": ans}
 
-            # Check for Parish Profile & History
-            is_parish_profile = len(raw_results) == 1 and any(k in raw_results[0] for k in ["patron_saint", "feast_day", "assistant_priest", "note"]) and any(k in (state.get("question") or "").lower() for k in ["profile", "history", "about", "priest", "saint", "feast", "church"])
+            # Check for Parish Profile & History (Strictly for tabParish)
+            table_match = re.search(r'FROM\s+`?(tab[A-Za-z0-9_ ]+)`?', state.get("generated_sql", ""), re.IGNORECASE)
+            sql_table = table_match.group(1).strip().strip('`') if table_match else ""
+            is_parish_profile = len(raw_results) == 1 and sql_table == "tabParish" and any(k in raw_results[0] for k in ["patron_saint", "feast_day", "assistant_priest"])
             if is_parish_profile:
                 row = raw_results[0]
                 p_name = row.get("parish_name") or row.get("name") or "Parish"
@@ -1693,8 +1566,8 @@ def format_response_node(state: GraphState) -> GraphState:
                     ans += f"📖 **History & Heritage:**\n{note}\n"
                 return {**state, "final_answer": ans}
 
-            # Check for Diocese Profile (only when a single diocese is requested)
-            is_single_diocese_profile = len(raw_results) == 1 and any(k in raw_results[0] for k in ["diocese_name", "bishop_name"]) and any(k in (state.get("question") or "").lower() for k in ["tell", "about", "profile", "history", "bishop", "chancery", "who is"])
+            # Check for Diocese Profile (Strictly for tabDiocese)
+            is_single_diocese_profile = len(raw_results) == 1 and sql_table == "tabDiocese" and any(k in raw_results[0] for k in ["diocese_name", "bishop_name"])
             if is_single_diocese_profile:
                 row = raw_results[0]
                 d_name = row.get("diocese_name") or row.get("name") or "Diocese"
@@ -1801,8 +1674,198 @@ def format_response_node(state: GraphState) -> GraphState:
                 label = str(k).replace("_", " ").title().replace("Count(*)", "Total Count").replace("Count(Idx)", "Total Count")
                 ans = f"**{label}**: {v}"
                 
-            # Format 2: Single Row, Multiple Columns
+            # Format 2: Single Row, Multiple Columns (Rich Sacramental Card / Certificate)
             elif len(raw_results) == 1 and len(headers) > 1:
+                row = raw_results[0]
+                table_match = re.search(r'FROM\s+`?(tab[A-Za-z0-9_ ]+)`?', state.get("generated_sql", ""), re.IGNORECASE)
+                table_name = table_match.group(1).strip().strip('`') if table_match else ""
+                
+                # Fetch full document from DB if we have a table and name/name match to ensure 100% complete data
+                if table_name:
+                    doctype_name = table_name.replace("tab", "", 1) if table_name.startswith("tab") else table_name
+                    doc_id = row.get("name")
+                    if not doc_id and row.get("first_name"):
+                        try:
+                            import frappe
+                            match_query = "SELECT * FROM `" + table_name + "` WHERE first_name = %s"
+                            params = [row.get("first_name")]
+                            if row.get("last_name"):
+                                match_query += " AND last_name = %s"
+                                params.append(row.get("last_name"))
+                            match_query += " LIMIT 1"
+                            full_db_rows = frappe.db.sql(match_query, tuple(params), as_dict=True)
+                            if full_db_rows:
+                                row = {**full_db_rows[0], **row}
+                                doc_id = row.get("name")
+                        except Exception as e:
+                            print(f"[format_response] DB row lookup: {e}")
+
+                def _fmt_d(val):
+                    if not val: return "-"
+                    if hasattr(val, "strftime"): return val.strftime("%d-%b-%Y")
+                    return str(val)
+                
+                def _join_names(*names):
+                    parts = [str(n).strip() for n in names if n and str(n).strip() not in ("", "None", "null", "NULL")]
+                    return " ".join(parts) if parts else "-"
+
+                # --- A. BAPTISM CERTIFICATE CARD ---
+                if "tabBaptism" in table_name or "bapt_date" in row:
+                    cand_name = _join_names(row.get("first_name"), row.get("middle_name"), row.get("last_name"))
+                    reg_no = row.get("name") or "-"
+                    reg_ref = row.get("bapt_register_ref") or "-"
+                    parish = row.get("bapt_parish_id") or row.get("parish_name") or row.get("parish_id") or "-"
+                    diocese = row.get("diocese_id") or "-"
+                    fc_no = row.get("family_card_no") or "-"
+                    gender = row.get("gender") or "-"
+                    dob = _fmt_d(row.get("dob"))
+                    pob = row.get("birth_place") or "-"
+                    b_date = _fmt_d(row.get("bapt_date"))
+                    b_place = row.get("bapt_place") or parish
+                    minister = row.get("bapt_minister") or "-"
+                    pp = row.get("parish_priest") or "-"
+                    f_name = row.get("father_name") or "-"
+                    f_occ = f" *({row.get('father_occupation')})*" if row.get("father_occupation") else ""
+                    m_name = row.get("mother_name") or "-"
+                    m_occ = f" *({row.get('mother_occupation')})*" if row.get("mother_occupation") else ""
+                    gf = _join_names(row.get("bapt_god_father"), row.get("bapt_god_father_last_name"))
+                    gm = _join_names(row.get("bapt_god_mother"), row.get("bapt_god_mother_last_name"))
+
+                    ans = f"### 🕊️ Holy Baptism Registry Record: **{cand_name}**\n\n"
+                    ans += "| 📜 Registry Identification | Value |\n"
+                    ans += "| :--- | :---\n"
+                    ans += f"| **Registration Number (ID)** | `{reg_no}` |\n"
+                    ans += f"| **Baptism Register Ref** | `{reg_ref}` |\n"
+                    ans += f"| **Parish Church** | {parish} |\n"
+                    ans += f"| **Diocese** | {diocese} Diocese |\n"
+                    ans += f"| **Family Card Number** | `{fc_no}` |\n\n"
+                    ans += f"#### 👤 Personal Details\n"
+                    ans += f"• **Full Name:** {cand_name}\n"
+                    ans += f"• **Gender:** {gender}\n"
+                    ans += f"• **Date of Birth:** {dob}\n"
+                    ans += f"• **Place of Birth:** {pob}\n\n"
+                    ans += f"#### 🕊️ Sacramental Administration\n"
+                    ans += f"• **Date of Baptism:** {b_date}\n"
+                    ans += f"• **Place of Baptism:** {b_place}\n"
+                    ans += f"• **Administering Minister:** {minister}\n"
+                    ans += f"• **Parish Priest:** {pp}\n\n"
+                    ans += f"#### 👨‍👩‍👧 Family & Parents\n"
+                    ans += f"• **Father's Name:** {f_name}{f_occ}\n"
+                    ans += f"• **Mother's Name:** {m_name}{m_occ}\n\n"
+                    ans += f"#### ✝️ Godparents / Sponsors\n"
+                    ans += f"• **Godfather:** {gf}\n"
+                    ans += f"• **Godmother:** {gm}\n"
+                    return {**state, "final_answer": ans}
+
+                # --- B. FIRST HOLY COMMUNION CARD ---
+                elif "tabCommunion" in table_name or "fhc_date" in row:
+                    cand_name = _join_names(row.get("first_name"), row.get("middle_name"), row.get("last_name"))
+                    reg_no = row.get("name") or "-"
+                    parish = row.get("fhc_parish_id") or row.get("parish_name") or row.get("parish_id") or "-"
+                    diocese = row.get("diocese_id") or "-"
+                    fc_no = row.get("family_card_no") or "-"
+                    fhc_date = _fmt_d(row.get("fhc_date"))
+                    fhc_place = row.get("fhc_place") or parish
+                    minister = row.get("fhc_minister") or "-"
+                    f_name = row.get("father_name") or "-"
+                    m_name = row.get("mother_name") or "-"
+
+                    ans = f"### 🍞 First Holy Communion Registry Record: **{cand_name}**\n\n"
+                    ans += "| 📜 Registry Details | Value |\n"
+                    ans += "| :--- | :---\n"
+                    ans += f"| **Registration Number (ID)** | `{reg_no}` |\n"
+                    ans += f"| **Parish Church** | {parish} |\n"
+                    ans += f"| **Diocese** | {diocese} Diocese |\n"
+                    ans += f"| **Family Card Number** | `{fc_no}` |\n\n"
+                    ans += f"#### 👤 Candidate & Sacrament Details\n"
+                    ans += f"• **Full Name:** {cand_name}\n"
+                    ans += f"• **Date of First Communion:** {fhc_date}\n"
+                    ans += f"• **Place:** {fhc_place}\n"
+                    ans += f"• **Administering Minister:** {minister}\n\n"
+                    ans += f"#### 👨‍👩‍👧 Parents\n"
+                    ans += f"• **Father:** {f_name} | **Mother:** {m_name}\n"
+                    return {**state, "final_answer": ans}
+
+                # --- C. CONFIRMATION CARD ---
+                elif "tabConfirmation" in table_name or "cnf_date" in row:
+                    cand_name = _join_names(row.get("first_name"), row.get("middle_name"), row.get("last_name"))
+                    reg_no = row.get("name") or "-"
+                    parish = row.get("cnf_parish_id") or row.get("parish_name") or row.get("parish_id") or "-"
+                    cnf_date = _fmt_d(row.get("cnf_date"))
+                    minister = row.get("cnf_minister") or "-"
+                    sponsor = row.get("sponsor_name") or "-"
+
+                    ans = f"### 🕊️ Sacrament of Confirmation Record: **{cand_name}**\n\n"
+                    ans += f"• **Candidate Name:** {cand_name}\n"
+                    ans += f"• **Confirmation Date:** {cnf_date}\n"
+                    ans += f"• **Parish Church:** {parish}\n"
+                    ans += f"• **Administering Minister:** {minister}\n"
+                    ans += f"• **Confirmation Sponsor:** {sponsor}\n"
+                    return {**state, "final_answer": ans}
+
+                # --- D. HOLY MATRIMONY CARD ---
+                elif "tabMarriage" in table_name or "mrg_date" in row:
+                    groom = _join_names(row.get("bridegroom_name"), row.get("bridegroom_middle_name"), row.get("bridegroom_last_name"))
+                    bride = _join_names(row.get("bride_name"), row.get("bride_middle_name"), row.get("bride_last_name"))
+                    reg_no = row.get("name") or "-"
+                    parish = row.get("mrg_parish_id") or row.get("parish_name") or row.get("parish_id") or "-"
+                    m_date = _fmt_d(row.get("mrg_date"))
+                    m_place = row.get("mrg_place") or parish
+                    minister = row.get("mrg_minister") or "-"
+                    w1 = row.get("witness1_name") or "-"
+                    w2 = row.get("witness2_name") or "-"
+
+                    ans = f"### 💍 Holy Matrimony Registry Record\n\n"
+                    ans += "| 📜 Registry Details | Value |\n"
+                    ans += "| :--- | :---\n"
+                    ans += f"| **Registration Number (ID)** | `{reg_no}` |\n"
+                    ans += f"| **Parish Church** | {parish} |\n"
+                    ans += f"| **Date of Marriage** | {m_date} |\n"
+                    ans += f"| **Solemnizing Minister** | {minister} |\n\n"
+                    ans += f"#### 👫 Holy Couple\n"
+                    ans += f"• **Bridegroom:** {groom}\n"
+                    ans += f"• **Bride:** {bride}\n\n"
+                    ans += f"#### ✍️ Official Witnesses\n"
+                    ans += f"• **Witness 1:** {w1} | **Witness 2:** {w2}\n"
+                    return {**state, "final_answer": ans}
+
+                # --- E. MEMBER PROFILE CARD ---
+                elif "tabMember" in table_name or "living_status" in row:
+                    m_name = _join_names(row.get("first_name"), row.get("middle_name"), row.get("last_name"))
+                    reg_no = row.get("name") or "-"
+                    parish = row.get("parish_name") or row.get("parish_id") or "-"
+                    diocese = row.get("diocese_id") or "-"
+                    gender = row.get("gender") or "-"
+                    dob = _fmt_d(row.get("dob"))
+                    age = str(row.get("age")) if row.get("age") else "-"
+                    marital = row.get("marital_status_id") or "-"
+                    blood = row.get("blood_group_id") or "-"
+                    occ = row.get("occupation") or "-"
+                    edu = row.get("education") or "-"
+                    mob = row.get("mobile") or "-"
+                    status = row.get("living_status") or "Alive"
+                    b_date = _fmt_d(row.get("bapt_date"))
+                    fhc_date = _fmt_d(row.get("fhc_date"))
+                    cnf_date = _fmt_d(row.get("cnf_date"))
+                    mrg_date = _fmt_d(row.get("mrg_date"))
+
+                    ans = f"### 👤 Parishioner Profile: **{m_name}**\n\n"
+                    ans += "| 📜 Membership Details | Value |\n"
+                    ans += "| :--- | :---\n"
+                    ans += f"| **Member ID** | `{reg_no}` |\n"
+                    ans += f"| **Parish Church** | {parish} |\n"
+                    ans += f"| **Diocese** | {diocese} Diocese |\n"
+                    ans += f"| **Living Status** | {status} |\n\n"
+                    ans += f"#### 📋 Demographic & Contact Info\n"
+                    ans += f"• **Full Name:** {m_name} ({gender})\n"
+                    ans += f"• **Date of Birth / Age:** {dob} ({age} yrs)\n"
+                    ans += f"• **Marital Status:** {marital} | **Blood Group:** {blood}\n"
+                    ans += f"• **Occupation / Education:** {occ} / {edu}\n"
+                    ans += f"• **Mobile:** {mob}\n\n"
+                    ans += f"#### 🕊️ Sacramental Milestones\n"
+                    ans += f"• **Baptism:** {b_date} | **Holy Communion:** {fhc_date}\n"
+                    ans += f"• **Confirmation:** {cnf_date} | **Holy Matrimony:** {mrg_date}\n"
+                    return {**state, "final_answer": ans}
                 # Try to fetch full document details if possible to display all fields
                 table_match = re.search(r'FROM\s+`?(tab[A-Za-z0-9_ ]+)`?', state.get("generated_sql", ""), re.IGNORECASE)
                 doc_detail_card = None
