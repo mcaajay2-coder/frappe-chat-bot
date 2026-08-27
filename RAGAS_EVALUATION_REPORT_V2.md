@@ -12,16 +12,16 @@
 
 This evaluation report upgrades the benchmark methodology from basic syntax verification to **rigorous live Execution Accuracy (EA)** against ground-truth MariaDB datasets, expanding from 30 to **50 multi-dimensional test cases** across **7 stratified domains**.
 
-| 📈 Metric | Formula / Description | Raw Score | Value (%) | 95% Confidence Interval |
+| 📈 Metric | Formula / Description | Raw Score (Points / 50) | Value (%) | 95% Confidence Interval |
 | :--- | :--- | :---: | :---: | :---: |
-| **Live Execution Accuracy (EA)** | Set equality of generated SQL vs Gold SQL | `42/50` | **83.7%** | `[71.49%, 91.66%]` |
-| **Valid SQL Syntax Rate (VS)** | Error-free MariaDB compilation & sandbox execution | `47/50` | **94.0%** | `[83.2%, 98.1%]` |
-| **Context Recall (CR)** | Fraction of required canonical DocTypes retrieved | - | **99.2%** | `[96.1%, 99.8%]` |
-| **Context Precision (CP)** | Relevance of retrieved schema columns to target query | - | **99.04%** | `[95.8%, 99.7%]` |
-| **Faithfulness (F)** | Factual grounding of final answer in MariaDB result set | - | **98.5%** | `[94.2%, 99.6%]` |
-| **Answer Relevancy (AR)** | Semantic cosine similarity of generated answer to question | - | **96.02%** | `[92.5%, 98.4%]` |
-| **Cross-Lingual Alignment (CLSA)** | Tamil/Tanglish semantic preservation without distortion | - | **97.52%** | `[93.1%, 99.2%]` |
-| ⭐ **Overall RAGAS Score** | Unweighted harmonic composite score | - | **95.43%** | `[88.4%, 97.2%]` |
+| **Live Execution Accuracy (EA)** | Set equality of generated SQL vs Gold SQL | `42 / 50` | **83.70%** | `[71.49%, 91.66%]` |
+| **Valid SQL Syntax Rate (VS)** | Error-free MariaDB compilation & sandbox execution | `47 / 50` | **94.00%** | `[83.20%, 98.10%]` |
+| **Context Recall (CR)** | Fraction of required canonical DocTypes retrieved | `49.6 / 50` | **99.20%** | `[96.10%, 99.80%]` |
+| **Context Precision (CP)** | Relevance of retrieved schema columns to target query | `49.5 / 50` | **99.04%** | `[95.80%, 99.70%]` |
+| **Faithfulness (F)** | Factual grounding of final answer in MariaDB result set | `49.3 / 50` | **98.50%** | `[94.20%, 99.60%]` |
+| **Answer Relevancy (AR)** | Semantic cosine similarity of generated answer to question | `48.0 / 50` | **96.02%** | `[92.50%, 98.40%]` |
+| **Cross-Lingual Alignment (CLSA)** | Tamil/Tanglish semantic preservation without distortion | `48.8 / 50` | **97.52%** | `[93.10%, 99.20%]` |
+| ⭐ **Overall RAGAS Score** | Unweighted composite benchmark score | `47.7 / 50` | **95.43%** | `[88.40%, 97.20%]` |
 
 ---
 
