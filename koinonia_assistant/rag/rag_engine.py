@@ -702,7 +702,22 @@ def enhance_query_node(state: GraphState) -> GraphState:
     history = state.get("history", [])
     reference_text = (state.get("reference_text") or "").strip()
     
-    reference_keywords = ["them", "they", "those", "these", "their", "him", "her", "it", "list them", "show them", "the same", "above", "this", "that", "next", "more", "remaining", "page", "next records", "next 50", "next page"]
+    reference_keywords = [
+        # English Pronouns & Context Triggers
+        "them", "they", "those", "these", "their", "him", "her", "it", "list them", "show them", 
+        "the same", "above", "this", "that", "next", "more", "remaining", "page", "next records", 
+        "next 50", "next page", "who are they", "what are their", "show their", "give their", "whose", "details",
+        
+        # Tamil Pronouns & Context Triggers (தமிழ் வினாத் தொடர்ச்சி)
+        "அவர்கள்", "அவர்களை", "அவர்களின்", "அவங்களோட", "அவங்கள", "அவங்களுக்கு", "அவங்களை", "அவங்க", 
+        "அதை", "அவற்றின்", "அவற்றில்", "அதில்", "மேலே", "மேற்கண்ட", "இவர்கள்", "இவர்களை", "இவர்களின்", 
+        "இவங்களோட", "இவங்கள", "இவங்களுக்கு", "இவங்க", "அவர்களின் பெயர்", "பட்டியல்", "விபரம் குடு", "விவரம்",
+        "குடும்ப அட்டை", "அட்டை எண்", "பங்கு பெயர்", "குடு", "தாங்க", "காட்டு",
+        
+        # Tanglish Pronouns & Triggers
+        "avanga", "avangala", "avangaloda", "avangaluku", "ivanga", "ivangala", "ivangaloda", "ivangaluku", 
+        "adhu", "adhula", "mela ulla", "mela irukura", "details kudu", "list kudu", "show their", "their parish"
+    ]
     q_lower = question.lower()
     has_reference_keyword = any(re.search(r'\b' + re.escape(kw) + r'\b', q_lower) for kw in reference_keywords)
     
