@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KOINONIA Assistant - Simplified System Architecture</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; }
+        body { background: #0B0F19; color: #F8FAFC; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 24px; }
+        .header { text-align: center; margin-bottom: 20px; }
+        .header h1 { font-size: 26px; color: #38BDF8; margin-bottom: 6px; }
+        .header p { color: #94A3B8; font-size: 14px; }
+        .toolbar { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; justify-content: center; }
+        .btn { background: #1E293B; border: 1px solid #38BDF8; color: #38BDF8; padding: 8px 18px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 6px; }
+        .btn:hover { background: #38BDF8; color: #0F172A; }
+        .btn-primary { background: #38BDF8; color: #0F172A; }
+        .btn-primary:hover { background: #0EA5E9; }
+        .diagram-container { width: 100%; max-width: 1100px; height: 80vh; background: #0F172A; border: 1px solid #334155; border-radius: 12px; overflow: hidden; position: relative; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5); }
+        #mermaid-wrapper { width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; }
+        svg { width: 100% !important; height: 100% !important; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🏛️ KOINONIA Assistant — Core System Architecture</h1>
+        <p>Simplified 5-Component Architectural Blueprint</p>
+    </div>
+
+    <div class="toolbar">
+        <button class="btn btn-primary" onclick="downloadSVG()">📥 Download SVG (Vector)</button>
+        <button class="btn" onclick="downloadPNG()">🖼️ Download PNG (High-Res)</button>
+        <button class="btn" onclick="panZoom.reset()">🔄 Reset Zoom</button>
+        <button class="btn" onclick="panZoom.zoomIn()">🔍 Zoom In</button>
+        <button class="btn" onclick="panZoom.zoomOut()">🔎 Zoom Out</button>
+    </div>
+
+    <div class="diagram-container">
+        <div id="mermaid-wrapper">
+            <pre class="mermaid">
+graph TD
+    %% Global Clean Styling
+    classDef client fill:#0F172A,stroke:#38BDF8,stroke-width:2px,color:#FFFFFF;
+    classDef backend fill:#1E293B,stroke:#818CF8,stroke-width:2px,color:#FFFFFF;
+    classDef aiEngine fill:#064E3B,stroke:#34D399,stroke-width:2px,color:#FFFFFF;
+    classDef external fill:#4C1D95,stroke:#C084FC,stroke-width:2px,color:#FFFFFF;
+    classDef database fill:#1E1B4B,stroke:#F59E0B,stroke-width:2px,color:#FFFFFF;
+
+    %% 1. CLIENT LAYER
+    subgraph C1 ["💻 1. CLIENT / FRONTEND"]
+        Client["🖥️ Web Chat UI & Frappe Desk<br/>• Voice Input (Audio Recording)<br/>• Text Query & Multi-Turn Chat<br/>• Sacramental Cards, Tables & PDF/Excel Exports"]:::client
+    end
+
+    %% 2. BACKEND LAYER
+    subgraph C2 ["⚙️ 2. BACKEND & SECURITY (Frappe Framework v15)"]
+        Backend["🛡️ Backend API & Jurisdiction Guard<br/>• REST API Endpoint: process_message()<br/>• Role-Based Access Control (Diocese / Parish Scope)<br/>• SQL Injection & Threat Interception"]:::backend
+    end
+
+    %% 3. AI ORCHESTRATION LAYER
+    subgraph C3 ["🧠 3. AI REASONING ENGINE (LangGraph)"]
+        AIEngine["🤖 LangGraph RAG Pipeline<br/>• Intent Router & Context Enhancer<br/>• Schema Retriever & Re-Ranker<br/>• Text-to-SQL Generator (48 Domain Rules)<br/>• AST Sandbox Validator & Response Formatter"]:::aiEngine
+    end
+
+    %% 4. EXTERNAL AI CLOUD
+    subgraph C4 ["☁️ 4. EXTERNAL AI CLOUD SERVICES"]
+        STT["🎙️ Sarvam AI (Speech-to-Text)"]:::external
+        LLM["⚡ Groq LLM Pool (Qwen-27B / OSS-120B)"]:::external
+    end
+
+    %% 5. PERSISTENCE LAYER
+    subgraph C5 ["🗄️ 5. DATABASE & STORAGE LAYER"]
+        MariaDB[("🏛️ MariaDB 10.6 Database<br/>(Sacramental & Member Records)")]:::database
+        PgVector[("🗄️ PostgreSQL 16 + pgvector<br/>(Schema & Few-Shot Embeddings)")]:::database
+    end
+
+    %% Clean Connecting Flows
+    Client <-->|Voice Audio / Text & Responses| Backend
+    Backend <-->|Speech Audio / Transcripts| STT
+    Backend <-->|Authorized Query Context| AIEngine
+    AIEngine <-->|Prompt & SQL Generation| LLM
+    AIEngine <-->|Schema Search Embeddings| PgVector
+    AIEngine <-->|Execute SQL & Fetch Data Rows| MariaDB
+            </pre>
+        </div>
+    </div>
+
+    <script>
+        mermaid.initialize({ startOnLoad: true, theme: 'dark', securityLevel: 'loose' });
+        let panZoom;
+        window.addEventListener('load', function() {
+            setTimeout(function() {
+                const svg = document.querySelector("#mermaid-wrapper svg");
+                if (svg) {
+                    panZoom = svgPanZoom(svg, { zoomEnabled: true, controlIconsEnabled: false, fit: true, center: true, minZoom: 0.2, maxZoom: 10 });
+                }
+            }, 800);
+        });
+
+        function downloadSVG() {
+            const svg = document.querySelector("#mermaid-wrapper svg");
+            const serializer = new XMLSerializer();
+            const source = serializer.serializeToString(svg);
+            const blob = new Blob([source], { type: "image/svg+xml;charset=utf-8" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "KOINONIA_Simple_System_Architecture.svg";
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
+        function downloadPNG() {
+            const svg = document.querySelector("#mermaid-wrapper svg");
+            const serializer = new XMLSerializer();
+            const source = serializer.serializeToString(svg);
+            const svgBlob = new Blob([source], { type: "image/svg+xml;charset=utf-8" });
+            const URL_OBJ = window.URL || window.webkitURL || window;
+            const blobURL = URL_OBJ.createObjectURL(svgBlob);
+            
+            const image = new Image();
+            image.onload = function() {
+                const canvas = document.createElement("canvas");
+                canvas.width = image.width * 2 || 2200;
+                canvas.height = image.height * 2 || 2600;
+                const context = canvas.getContext("2d");
+                context.fillStyle = "#0B0F19";
+                context.fillRect(0, 0, canvas.width, canvas.height);
+                context.drawImage(image, 0, 0, canvas.width, canvas.height);
+                
+                const pngURL = canvas.toDataURL("image/png");
+                const a = document.createElement("a");
+                a.href = pngURL;
+                a.download = "KOINONIA_Simple_System_Architecture.png";
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            };
+            image.src = blobURL;
+        }
+    </script>
+</body>
+</html>
