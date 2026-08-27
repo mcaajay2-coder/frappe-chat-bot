@@ -594,7 +594,12 @@ CRITICAL RULES:
 1. Return ONLY the extended, standalone question string.
 2. Do NOT add markdown, explanations, or quotes.
 3. Preserve all specific entity names (names, dates, years, sacraments).
-4. When the user asks about family details or family members of a person from a search list, do NOT force baptism dates or sacrament table filters into the family question."""),
+4. STRICT SACRAMENT CONTEXT PRESERVATION:
+   - If prior conversation is about First Holy Communion / புது நன்மை / FHC -> The extended query MUST remain about First Holy Communion (tabCommunion). NEVER change it to Confirmation or Baptism.
+   - If prior conversation is about Baptism / ஞானஸ்நானம் -> The extended query MUST remain about Baptism (tabBaptism).
+   - If prior conversation is about Confirmation / உறுதிப்பூசுதல் -> The extended query MUST remain about Confirmation (tabConfirmation).
+   - If prior conversation is about Marriage / திருமணம் -> The extended query MUST remain about Marriage (tabMarriage).
+5. When user asks for parish name / பங்கு பெயர் and family card / குடும்ப அட்டை -> ALWAYS explicitly include "parish name (fhc_parish_id AS parish_name)" and "family card number (family_card_no)" in the extended query."""),
     ("human", "{reference_context}\nLatest User Question: {question}"),
 ])
 
@@ -603,6 +608,9 @@ STANDALONE_ENHANCE_PROMPT = ChatPromptTemplate.from_messages([
 Your task is to convert Tamil, Tanglish, and English questions with typos/phonetics into a clean, unambiguous standalone English search query for a church/sacrament database.
 
 CATHOLIC TAMIL TERMINOLOGY MAPPINGS:
+- "பங்கு பெயர்" / "பங்கின் பெயர்" / "பங்கு" -> Parish Name (fhc_parish_id AS parish_name / bapt_parish_id AS parish_name / mrg_parish_id AS parish_name / parish_id AS parish_name)
+- "குடும்ப அட்டை எண்" / "குடும்ப அட்டை" / "அட்டை எண்" -> Family Card Number (family_card_no)
+- "பங்கினர் பெயர்" / "விசுவாசி பெயர்" / "நபரின் பெயர்" -> Person Full Name (first_name, middle_name, last_name)
 - "புது நன்மை" / "புதுநன்மை" / "முதல் நற்கருணை" / "நற்கருணை" -> First Holy Communion (tabCommunion)
 - "ஞானஸ்நானம்" / "திருமுழுக்கு" / "மாமோதீசா" -> Baptism (tabBaptism)
 - "உறுதிப்பூசுதல்" / "அபிஷேகம்" -> Confirmation (tabConfirmation)
@@ -667,6 +675,13 @@ def clean_church_query_text(text: str) -> str:
         (r'\bகடைசிப்\s*பூசுதல்\b', 'Anointing of the Sick (நோயில் பூசுதல்)'),
         (r'\bஅடக்கம்\b', 'Christian Burial Death (அடக்கம்)'),
         (r'\bமரணப்\s*பதிவு\b', 'Death Register (மரணப் பதிவு)'),
+        (r'\bபங்கு\s*பெயர்\b', 'parish name (fhc_parish_id AS parish_name)'),
+        (r'\bபங்கின்\s*பெயர்\b', 'parish name (fhc_parish_id AS parish_name)'),
+        (r'\bpangu\s*peyar\b', 'parish name'),
+        (r'\bpangyin\s*peyar\b', 'parish name'),
+        (r'\bபங்கு\b', 'parish'),
+        (r'\bபங்குகள்\b', 'parishes'),
+        (r'\bகுடும்ப\s*அட்டை(?:\s*எண்)?\b', 'family card number (family_card_no)'),
         (r'\bமரித்தவர்கள்\b', 'Death Register (மரித்தவர்கள்)'),
         (r'\bcarrots?\b', 'vicars'),
         (r'\bkarots?\b', 'vicars'),
@@ -804,6 +819,7 @@ SQL_GEN_PROMPT = ChatPromptTemplate.from_messages([
 ### Table Selection & Entity Routing:
 - BAPTISM ("baptized", "christened", "bapt date", "godfather", "godmother") → `tabBaptism`
 - COMMUNION ("first communion", "FHC", "holy communion", "புது நன்மை", "நற்கருணை") → `tabCommunion` (Never tabMember)
+  - When listing communion recipients with parish name and family card: `SELECT first_name, middle_name, last_name, fhc_parish_id AS parish_name, family_card_no FROM tabCommunion WHERE diocese_id = '{user_diocese}' AND YEAR(fhc_date) = 1995`
 - CONFIRMATION ("confirmed", "confirmation", "CNF", "sponsor", "உறுதிப்பூசுதல்") → `tabConfirmation`
 - MARRIAGE ("married", "wedding", "groom", "bride", "திருமணம்") → `tabMarriage` (Search both `bridegroom_name` and `bride_name`)
 - DEATH / BURIAL ("died", "death", "buried", "cemetery", "இறப்பு", "அடக்கம்") → `tabDeath`
@@ -1007,9 +1023,9 @@ def sanitize_select_clause(sql: str, question: str = "") -> str:
     table_name = table_match.group(1).strip().strip('`')
     
     preferred_cols = {
-        "tabBaptism": ["first_name", "middle_name", "last_name", "bapt_date", "bapt_parish_id"],
-        "tabCommunion": ["first_name", "middle_name", "last_name", "fhc_date", "fhc_parish_id"],
-        "tabConfirmation": ["first_name", "middle_name", "last_name", "cnf_date", "cnf_parish_id"],
+        "tabBaptism": ["first_name", "middle_name", "last_name", "bapt_parish_id", "family_card_no", "bapt_date"],
+        "tabCommunion": ["first_name", "middle_name", "last_name", "fhc_parish_id", "family_card_no", "fhc_date"],
+        "tabConfirmation": ["first_name", "middle_name", "last_name", "cnf_parish_id", "family_card_no", "cnf_date"],
         "tabMarriage": ["bridegroom_name", "bridegroom_middle_name", "bridegroom_last_name", "bride_name", "mrg_date"],
         "tabAnointing Of Sick": ["first_name", "middle_name", "last_name", "anointing_date", "minister"],
         "tabDeath": ["first_name", "middle_name", "last_name", "death_date", "age"],
@@ -1059,7 +1075,7 @@ def sanitize_select_clause(sql: str, question: str = "") -> str:
             
             # Scan the original select_part for specific keywords requested (like mobile, email, phone, address, etc.)
             # and preserve them if they were selected in the original SQL
-            special_keywords = ["mobile", "email", "phone", "address", "website", "established_date", "dob", "cemetery_code", "note", "assistant_priest"]
+            special_keywords = ["mobile", "email", "phone", "address", "website", "established_date", "dob", "cemetery_code", "note", "assistant_priest", "family_card_no", "parish_name", "fhc_parish_id", "bapt_parish_id", "cnf_parish_id", "mrg_parish_id"]
             for col in selected_cols:
                 col_lower = col.lower()
                 if any(kw in col_lower for kw in special_keywords):
@@ -1709,9 +1725,11 @@ def format_response_node(state: GraphState) -> GraphState:
                 
             # Define priority ordering weights for common meaningful fields (lower weight = higher priority)
             field_weights = {
-                # Names
+                # Names & Canonical Identifiers
                 'full_name': 0, 'first_name': 1, 'middle_name': 2, 'last_name': 3,
                 'diocese_name': 1, 'vicariate_name': 1, 'parish_name': 1, 'family_name': 1,
+                'fhc_parish_id': 1, 'bapt_parish_id': 1, 'mrg_parish_id': 1, 'cnf_parish_id': 1, 'death_parish_id': 1, 'parish_id': 1,
+                'family_card_no': 2, 'family_register_number': 2,
                 'bishop_name': 2, 'vicar_forane': 2, 'parish_priest': 2, 'family_head': 2,
                 'bridegroom_name': 1, 'bride_name': 2, 'witness1_name': 4, 'witness2_name': 5,
                 
