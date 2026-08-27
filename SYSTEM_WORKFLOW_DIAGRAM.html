@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KOINONIA Assistant - Complete System Workflow Diagram</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; }
+        body { background: #0B0F19; color: #F8FAFC; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 24px; }
+        .header { text-align: center; margin-bottom: 20px; }
+        .header h1 { font-size: 26px; color: #38BDF8; margin-bottom: 6px; }
+        .header p { color: #94A3B8; font-size: 14px; }
+        .toolbar { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; justify-content: center; }
+        .btn { background: #1E293B; border: 1px solid #38BDF8; color: #38BDF8; padding: 8px 18px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 6px; }
+        .btn:hover { background: #38BDF8; color: #0F172A; }
+        .btn-primary { background: #38BDF8; color: #0F172A; }
+        .btn-primary:hover { background: #0EA5E9; }
+        .diagram-container { width: 100%; max-width: 1400px; height: 85vh; background: #0F172A; border: 1px solid #334155; border-radius: 12px; overflow: hidden; position: relative; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5); }
+        #mermaid-wrapper { width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; }
+        svg { width: 100% !important; height: 100% !important; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🏛️ KOINONIA Assistant — Master System Workflow Architecture</h1>
+        <p>High-Definition Interactive Flow Diagram (10-Stage Execution Pipeline)</p>
+    </div>
+
+    <div class="toolbar">
+        <button class="btn btn-primary" onclick="downloadSVG()">📥 Download SVG (Vector)</button>
+        <button class="btn" onclick="downloadPNG()">🖼️ Download PNG (High-Res)</button>
+        <button class="btn" onclick="panZoom.reset()">🔄 Reset Zoom</button>
+        <button class="btn" onclick="panZoom.zoomIn()">🔍 Zoom In</button>
+        <button class="btn" onclick="panZoom.zoomOut()">🔎 Zoom Out</button>
+    </div>
+
+    <div class="diagram-container">
+        <div id="mermaid-wrapper">
+            <pre class="mermaid">
+flowchart TD
+    %% Global Styling Classes
+    classDef inputLayer fill:#0F172A,stroke:#38BDF8,stroke-width:2px,color:#FFFFFF;
+    classDef speechLayer fill:#312E81,stroke:#818CF8,stroke-width:2px,color:#FFFFFF;
+    classDef secLayer fill:#881337,stroke:#FB7185,stroke-width:2px,color:#FFFFFF;
+    classDef graphLayer fill:#064E3B,stroke:#34D399,stroke-width:2px,color:#FFFFFF;
+    classDef externalLayer fill:#4C1D95,stroke:#C084FC,stroke-width:2px,color:#FFFFFF;
+    classDef dbLayer fill:#1E1B4B,stroke:#A78BFA,stroke-width:2px,color:#FFFFFF;
+    classDef outputLayer fill:#78350F,stroke:#F59E0B,stroke-width:2px,color:#FFFFFF;
+    classDef decision fill:#451A03,stroke:#FBBF24,stroke-width:2px,color:#FFFFFF;
+
+    %% STAGE 1: USER INPUT LAYER
+    subgraph S1 ["1️⃣ USER & MULTIMODAL INPUT LAYER"]
+        User(["👤 User (Bishop / Priest / Staff / Parishioner)"]):::inputLayer
+        InputMode{"Input Mode?"}:::decision
+        VoiceIn["🎙️ Voice Audio Recording (Tamil / Tanglish / English)"]:::inputLayer
+        TextIn["💬 Typed Text Query + Multi-Turn History / Quoted Ref"]:::inputLayer
+    end
+
+    User --> InputMode
+    InputMode -- Voice Speech --> VoiceIn
+    InputMode -- Text Message --> TextIn
+
+    %% STAGE 2: AUDIO & SPEECH PROCESSING
+    subgraph S2 ["2️⃣ SPEECH & PHONETIC PREPROCESSING"]
+        Sarvam["📡 Sarvam AI REST API (Tamil/English Speech-to-Text)"]:::speechLayer
+        PhoneticClean["🧹 Catholic Lexicon & Phonetic Cleanser<br/>(Fixes 'புது நன்மை', 'ஞானஸ்நானம்', 'மரித்தவர்கள்', typos)"]:::speechLayer
+    end
+
+    VoiceIn -- "1. Sends Audio Blob" --> Sarvam
+    Sarvam -- "2. Transcribed Text" --> PhoneticClean
+    TextIn -- "1. Raw Text" --> PhoneticClean
+
+    %% STAGE 3: SECURITY & JURISDICTION GUARD
+    subgraph S3 ["3️⃣ SECURITY & ECCLESIASTICAL JURISDICTION GUARD"]
+        FrappeAPI["⚙️ Backend API: koinonia_assistant.api.process_message()"]:::secLayer
+        JurResolver["🔍 User Role & Jurisdiction Resolver (Diocese / Vicariate / Parish ID)"]:::secLayer
+        SecurityCheck{"Adversarial Threat Check?<br/>(SQLi / SLEEP / DROP / Foreign Diocese)"}:::decision
+        SecReject["🚫 Immediate 403 Security Interception & Refusal"]:::secLayer
+    end
+
+    PhoneticClean -- "3. Cleaned Query Text" --> FrappeAPI
+    FrappeAPI --> JurResolver
+    JurResolver --> SecurityCheck
+    SecurityCheck -- "Malicious / Unauthorized" --> SecReject
+    SecReject --> FinalResponse
+
+    %% STAGE 4: INTENT ROUTING & CONTEXT ENHANCEMENT
+    subgraph S4 ["4️⃣ INTENT ROUTING & MULTI-TURN CONTEXT"]
+        RouterNode["📍 Node 1: Router Node (Greeting vs Church Database Query)"]:::graphLayer
+        IntentCheck{"Intent Type?"}:::decision
+        GreetingNode["💬 Direct Greeting & Help Responder"]:::graphLayer
+        EnhancerNode["✨ Node 2: Enhance Query Node<br/>(Resolves Tamil Pronouns: 'அவங்களோட' ➡️ 1995 Communion Candidates)"]:::graphLayer
+    end
+
+    SecurityCheck -- "Authorized Query" --> RouterNode
+    RouterNode --> IntentCheck
+    IntentCheck -- "Greeting / Scope Info" --> GreetingNode
+    IntentCheck -- "Database Query" --> EnhancerNode
+    GreetingNode --> FinalResponse
+
+    %% STAGE 5: HYBRID SCHEMA RETRIEVAL (PostgreSQL + pgvector)
+    subgraph S5 ["5️⃣ HYBRID SCHEMA RETRIEVAL LAYER"]
+        RetrieverNode["🔎 Node 3: Schema Retriever Node (Inside LangGraph)"]:::graphLayer
+        BGEEmbedding["🔢 BGE-M3 Dense Embedding (1024-dim)"]:::graphLayer
+        PgVector[("🗄️ PostgreSQL 16 + pgvector<br/>(Stores 11 Table Schemas & Column Embeddings)")]:::externalLayer
+        CrossEncoder["⚖️ Cross-Encoder Re-Ranker (ms-marco-MiniLM)<br/>(Selects Top-5 Schemas & Exact Columns)"]:::graphLayer
+    end
+
+    EnhancerNode -- "4. Enhanced Standalone Question" --> RetrieverNode
+    RetrieverNode --> BGEEmbedding
+    BGEEmbedding -- "5. Search Vector (1024-dim)" --> PgVector
+    PgVector -- "6. Returns Candidate Schemas" --> CrossEncoder
+    CrossEncoder -- "7. Top-5 Ranked Table Schemas" --> SQLGenNode
+
+    %% STAGE 6: SQL GENERATION (Groq Multi-Key Pool)
+    subgraph S6 ["6️⃣ TEXT-TO-SQL GENERATION & LLM POOL"]
+        SQLGenNode["📝 Node 4: SQL Generator Node<br/>(Builds Prompt with 48 Canonical Rules & RBAC Scope)"]:::graphLayer
+        GroqPool["⚡ Groq 7-Key Multi-Key Rotator Pool<br/>(Qwen-27B / OSS-120B with TPM Rate-Limit Backoff)"]:::externalLayer
+        RawSQL["📄 Generated MariaDB SELECT Query"]:::graphLayer
+    end
+
+    SQLGenNode -- "8. Sends Prompt (Question + Rules + Schemas)" --> GroqPool
+    GroqPool -- "9. Returns Generated SQL String" --> RawSQL
+    RawSQL --> ValidatorNode
+
+    %% STAGE 7: SQL VALIDATION & ERROR RECOVERY
+    subgraph S7 ["7️⃣ SANDBOX VALIDATION & ERROR RECOVERY"]
+        ValidatorNode["🛡️ Node 5: AST Sandbox Validator<br/>(Polishes Columns + Runs EXPLAIN in MariaDB Sandbox)"]:::graphLayer
+        SandboxCheck{"Sandbox Status?"}:::decision
+        RewriterNode["🔄 Node 6: Auto SQL Rewriter Node<br/>(Error Feedback Loop, Max 2 Retries)"]:::graphLayer
+    end
+
+    ValidatorNode --> SandboxCheck
+    SandboxCheck -- "Syntax/Column Error" --> RewriterNode
+    RewriterNode -- "Fixed SQL" --> ValidatorNode
+
+    %% STAGE 8: DATABASE EXECUTION (MariaDB 10.6)
+    subgraph S8 ["8️⃣ RELATIONAL DATABASE EXECUTION"]
+        SQLExecNode["⚡ Node 7: MariaDB Execution Engine (Inside LangGraph)<br/>(Executes Validated Query via frappe.db.sql)"]:::graphLayer
+        MariaDBStore[("🏛️ MariaDB 10.6 Relational Database<br/>(Stores Real Church Records: Baptism, Marriage, Members)")]:::dbLayer
+        RawResults["📦 Raw Database Records (Rows / Dicts)"]:::graphLayer
+    end
+
+    SandboxCheck -- "Validation Passed" --> SQLExecNode
+    SQLExecNode -- "10. Sends Validated SQL Query" --> MariaDBStore
+    MariaDBStore -- "11. Returns Real Data Rows" --> RawResults
+    RawResults --> SQLExecNode
+    SQLExecNode -- "12. Forwards Raw Data Rows" --> FormatNode
+
+    %% STAGE 9: RESPONSE FORMATTING & VISUALIZATION
+    subgraph S9 ["9️⃣ RESPONSE FORMATTING & DATA REPRESENTATION"]
+        FormatNode["🎨 Node 8: Response Formatter Node (Inside LangGraph)"]:::outputLayer
+        FormatCheck{"Data Shape & User Request?"}:::decision
+        CardBuilder["🕊️ Sacramental Profile Card<br/>(Baptism / Marriage / Profile with All Details)"]:::outputLayer
+        TableBuilder["📋 Responsive Markdown Table<br/>(Paginated Columns with Full Name, Parish, Family Card)"]:::outputLayer
+        ChartBuilder["📈 Interactive Chart Visualizer<br/>(Bar Chart / Pie Chart / Trend Plot)"]:::outputLayer
+    end
+
+    FormatNode --> FormatCheck
+    FormatCheck -- "Single Record (1 Row)" --> CardBuilder
+    FormatCheck -- "Dataset List (2+ Rows)" --> TableBuilder
+    FormatCheck -- "Analytics / Chart Request" --> ChartBuilder
+
+    %% STAGE 10: EXPORT & CLIENT PRESENTATION
+    subgraph S10 ["🔟 PRESENTATION & 1-CLICK EXPORTS"]
+        ExcelExport["📑 1-Click Excel (.xlsx) Exporter"]:::outputLayer
+        PDFExport["📄 Official PDF Document Exporter (with Diocese Header)"]:::outputLayer
+        FinalResponse["💬 Unified JSON Response (User Question + Reply + SQL)"]:::outputLayer
+        ClientUI(["🖥️ Rendered in Glassmorphic Web UI & Frappe Desk"]):::inputLayer
+    end
+
+    CardBuilder --> FinalResponse
+    TableBuilder --> ExcelExport --> FinalResponse
+    TableBuilder --> PDFExport --> FinalResponse
+    ChartBuilder --> FinalResponse
+
+    FinalResponse --> ClientUI
+            </pre>
+        </div>
+    </div>
+
+    <script>
+        mermaid.initialize({ startOnLoad: true, theme: 'dark', securityLevel: 'loose' });
+        let panZoom;
+        window.addEventListener('load', function() {
+            setTimeout(function() {
+                const svg = document.querySelector("#mermaid-wrapper svg");
+                if (svg) {
+                    panZoom = svgPanZoom(svg, { zoomEnabled: true, controlIconsEnabled: false, fit: true, center: true, minZoom: 0.2, maxZoom: 10 });
+                }
+            }, 800);
+        });
+
+        function downloadSVG() {
+            const svg = document.querySelector("#mermaid-wrapper svg");
+            const serializer = new XMLSerializer();
+            const source = serializer.serializeToString(svg);
+            const blob = new Blob([source], { type: "image/svg+xml;charset=utf-8" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "KOINONIA_System_Workflow.svg";
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
+        function downloadPNG() {
+            const svg = document.querySelector("#mermaid-wrapper svg");
+            const serializer = new XMLSerializer();
+            const source = serializer.serializeToString(svg);
+            const svgBlob = new Blob([source], { type: "image/svg+xml;charset=utf-8" });
+            const URL_OBJ = window.URL || window.webkitURL || window;
+            const blobURL = URL_OBJ.createObjectURL(svgBlob);
+            
+            const image = new Image();
+            image.onload = function() {
+                const canvas = document.createElement("canvas");
+                canvas.width = image.width * 2 || 2400;
+                canvas.height = image.height * 2 || 3200;
+                const context = canvas.getContext("2d");
+                context.fillStyle = "#0B0F19";
+                context.fillRect(0, 0, canvas.width, canvas.height);
+                context.drawImage(image, 0, 0, canvas.width, canvas.height);
+                
+                const pngURL = canvas.toDataURL("image/png");
+                const a = document.createElement("a");
+                a.href = pngURL;
+                a.download = "KOINONIA_System_Workflow.png";
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            };
+            image.src = blobURL;
+        }
+    </script>
+</body>
+</html>
