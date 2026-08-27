@@ -960,7 +960,8 @@ def generate_sql_node(state: GraphState) -> GraphState:
             p_name = p.get("name") or ""
             p_dio = p.get("diocese_id") or ""
             short_p = p_name.replace("Parish", "").replace("Church", "").replace("Cathedral", "").replace("Shrine", "").strip()
-            if short_p and len(short_p) > 3 and re.search(r'\b' + re.escape(short_p.lower()) + r'\b', q_combined):
+            # Only match foreign parish if 'parish' or 'church' or 'பங்கு' is in query and 'cemetery' is not the primary target
+            if short_p and len(short_p) > 4 and re.search(r'\b' + re.escape(short_p.lower()) + r'\s+(?:parish|church|cathedral|shrine|பங்கு)\b', q_combined, re.IGNORECASE):
                 if user_diocese and p_dio and p_dio.lower() != user_diocese.lower():
                     print(f"[generate_sql] Access Restricted: User {user_role} of {user_diocese} requested parish '{p_name}' in foreign diocese '{p_dio}'")
                     return {
@@ -1260,7 +1261,17 @@ def validate_sql_node(state: GraphState) -> GraphState:
     if sql == "UNAUTHORIZED_PARISH":
         return {**state, "error_message": "Unauthorized parish access"}
 
-    # Automatically repair unescaped single quotes in parish names (e.g. 'St. Joseph's Parish' -> 'St. Joseph''s Parish')
+    # Automatically repair unescaped single quotes in parish & personal names (e.g. 'St. Joseph's' -> 'St. Joseph''s', 'D'Souza' -> 'D''Souza')
+    apostrophe_fixes = [
+        (r"'(St\.\s+[A-Za-z]+)'s\s+([^']*)'", r"'''s '"),
+        (r"'(St\.\s+[A-Za-z]+)'s'", r"'''s'"),
+        (r"'([A-Za-z]+)'s'", r"'''s'"),
+        (r"'([A-Z])'([A-Za-z]+)'", r"''''"),
+        (r"'(D|O|Mc|Mac)'([A-Za-z]+)'", r"''''"),
+    ]
+    for pat, rep in apostrophe_fixes:
+        sql = re.sub(pat, rep, sql, flags=re.IGNORECASE)
+
     user_parish = state.get("user_parish") or ""
     if user_parish and "'" in user_parish:
         raw_literal = f"'{user_parish}'"
@@ -1281,9 +1292,9 @@ def validate_sql_node(state: GraphState) -> GraphState:
     if not sql_upper.startswith("SELECT"):
         return {**state, "error_message": "Only SELECT queries are allowed."}
         
-    for forbidden in ["INSERT", "UPDATE", "DELETE", "DROP", "ALTER", "TRUNCATE", "REPLACE", "CREATE"]:
+    for forbidden in ["INSERT", "UPDATE", "DELETE", "DROP", "ALTER", "TRUNCATE", "REPLACE", "CREATE", "SLEEP", "BENCHMARK", "INFORMATION_SCHEMA", "INTO OUTFILE", "DUMPFILE", "LOAD_FILE"]:
         if re.search(r'\b' + forbidden + r'\b', sql_upper):
-            return {**state, "error_message": f"Query contains forbidden keyword: {forbidden}"}
+            return {**state, "error_message": f"Query contains forbidden security-sensitive keyword: {forbidden}"}
 
     clean_sql = re.sub(r'COUNT\s*\(\s*\*\s*\)', '', sql_upper)
     if '*' in clean_sql:
