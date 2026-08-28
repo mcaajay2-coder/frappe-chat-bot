@@ -1,3 +1,4 @@
+import psycopg2
 import frappe
 import requests
 import json
@@ -25,6 +26,12 @@ def clean_and_correct_voice_transcript(text: str) -> str:
         
     cleaned = str(text).strip()
     
+    # Bypass phonetic rewrite if query contains security attack payloads
+    sec_patterns = [r';\s*(?:DROP|ALTER|TRUNCATE|DELETE|INSERT|UPDATE)', r'(?:SLEEP|BENCHMARK|WAITFOR|GET_LOCK)', r'UNION\s+(?:ALL\s+)?SELECT', r'--\s*$', r'tabUser']
+    for sp in sec_patterns:
+        if re.search(sp, cleaned, re.IGNORECASE):
+            return cleaned
+    
     # 1. Specialized Catholic Diocesan phonetic pattern replacements for Tamil / Tanglish Voice
     phonetic_fixes = [
         (r'\bcarrots?\b', 'vicars'),
@@ -38,7 +45,7 @@ def clean_and_correct_voice_transcript(text: str) -> str:
         (r'\bbabtizum\b', 'baptism'),
         (r'\bbapthism\b', 'baptism'),
         (r'\bbapthisam\b', 'baptism'),
-        (r'\bunion\b', 'communion'),
+        (r'\bunion\s+(?!all\s+select|select)\b', 'communion'),
         (r'\bcnf\b', 'confirmation'),
         (r'\bmrg\b', 'marriage'),
         (r'\banbiyam\b', 'BCC'),
@@ -342,19 +349,23 @@ def process_message(query_text=None, history=None, reference_text=None):
         )
         
         # Get query ID for feedback via Postgres
-        conn = psycopg2.connect(**PG_CONFIG)
         query_id = -1
         try:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "SELECT id FROM koinonia_query_history WHERE user_question = %s ORDER BY id DESC LIMIT 1;",
-                    (query_text,)
-                )
-                row = cur.fetchone()
-                if row:
-                    query_id = row[0]
-        finally:
-            conn.close()
+            import psycopg2
+            conn = psycopg2.connect(**PG_CONFIG)
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "SELECT id FROM koinonia_query_history WHERE user_question = %s ORDER BY id DESC LIMIT 1;",
+                        (query_text,)
+                    )
+                    row = cur.fetchone()
+                    if row:
+                        query_id = row[0]
+            finally:
+                conn.close()
+        except Exception as pge:
+            print(f"[Koinonia Chat] Notice: query history id lookup: {pge}")
 
         reply = result.get("reply", "")
         generated_sql = result.get("generated_sql", "")
@@ -405,14 +416,17 @@ def log_query_feedback(query_id=None, is_correct=None):
         query_id = int(query_id)
         flag = 1 if str(is_correct).lower() == "true" else 0
 
+        import psycopg2
         conn = psycopg2.connect(**PG_CONFIG)
-        with conn.cursor() as cur:
-            cur.execute(
-                "UPDATE koinonia_query_history SET correctness_flag = %s WHERE id = %s;",
-                (flag, query_id)
-            )
-        conn.commit()
-        conn.close()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE koinonia_query_history SET correctness_flag = %s WHERE id = %s;",
+                    (flag, query_id)
+                )
+            conn.commit()
+        finally:
+            conn.close()
 
         print(f"[Koinonia Feedback] Query {query_id} marked as {flag}")
         return {"success": True, "query_id": query_id, "correctness_flag": flag}
@@ -460,6 +474,7 @@ def sync_doctype_schema(doc, method=None):
         from koinonia_assistant.rag.ingest import embed_text, build_field_description, upsert_pg_field
         embedding = embed_text(description)
 
+        import psycopg2
         conn = psycopg2.connect(**PG_CONFIG)
         with conn.cursor() as cur:
             cur.execute("""
@@ -504,6 +519,7 @@ def delete_doctype_schema(doc, method=None):
         table_name = f"tab{doc.name}"
         print(f"[Koinonia Hook] Deleting schema/fields for {doc.name} (table: {table_name}) from pgvector...")
         
+        import psycopg2
         conn = psycopg2.connect(**PG_CONFIG)
         with conn.cursor() as cur:
             cur.execute("DELETE FROM koinonia_table_schemas WHERE table_name = %s;", (table_name,))

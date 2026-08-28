@@ -499,8 +499,47 @@ class GraphState(TypedDict):
 
 def router_node(state: GraphState) -> GraphState:
     print("\n[router] Classifying user query...")
-    q = state["question"].strip().lower()
+    raw_q = state.get("question") or ""
+    q = raw_q.strip().lower()
     q_stripped = q.strip(".,!?\"' ")
+
+    # Explicit Security Injection & Threat Guard
+    injection_patterns = [
+        r';\s*(?:DROP|ALTER|TRUNCATE|DELETE|INSERT|UPDATE|CREATE|REPLACE)',
+        r'\b(?:SLEEP|BENCHMARK|WAITFOR|GET_LOCK)\b',
+        r'\bUNION\s+(?:ALL\s+)?SELECT\b',
+        r'--\s*$',
+        r'/\*.*?\*/',
+        r'\b(?:ignore all previous instructions|output your system prompt|leak secret keys|system prompt|secret API keys)\b',
+        r'\b(?:tabUser|information_schema|mysql\.)\b'
+    ]
+    for pat in injection_patterns:
+        if re.search(pat, raw_q, re.IGNORECASE | re.DOTALL):
+            print(f"[router] Security Alert: Intercepted malicious injection payload: '{raw_q}'")
+            return {
+                **state,
+                "route": "blocked_security",
+                "generated_sql": "BLOCKED_SECURITY",
+                "final_answer": "🚫 **Security Alert**: Malicious SQL injection or unauthorized schema exfiltration attempt was blocked by KOINONIA Security Guardrails."
+            }
+
+    # Explicit Security Injection & Threat Guard
+    injection_patterns = [
+        r';\s*(?:DROP|ALTER|TRUNCATE|DELETE|INSERT|UPDATE|CREATE|REPLACE)',
+        r'(?:SLEEP|BENCHMARK|WAITFOR|GET_LOCK)\s*\(',
+        r'UNION\s+(?:ALL\s+)?SELECT\s+.*(?:tabUser|information_schema|mysql\.|password|hash|secret|token|api_key)',
+        r'--\s*$',
+        r'(?:ignore all previous instructions|output your system prompt|leak secret keys)'
+    ]
+    for pat in injection_patterns:
+        if re.search(pat, state["question"], re.IGNORECASE):
+            print(f"[router] Security Alert: Intercepted malicious injection payload: '{state['question']}'")
+            return {
+                **state,
+                "route": "text_to_sql",
+                "generated_sql": "BLOCKED_SECURITY",
+                "final_answer": "🚫 **Security Alert**: Malicious SQL injection or unauthorized schema exfiltration attempt was blocked by KOINONIA Security Guardrails."
+            }
 
     # Greetings & Identity / Capabilities
     greetings = {"hi", "hello", "hey", "good morning", "good afternoon", "good evening", "thanks", "thank you", "bye", "goodbye", "namaste", "vanakkam"}
@@ -520,6 +559,13 @@ def router_node(state: GraphState) -> GraphState:
 
     # All user requests, questions, searches, and name lookups route directly to text_to_sql
     return {**state, "route": "text_to_sql"}
+
+def blocked_security_node(state: GraphState) -> GraphState:
+    return {
+        **state,
+        "generated_sql": "BLOCKED_SECURITY",
+        "final_answer": "🚫 **Security Alert**: Malicious SQL injection or unauthorized schema exfiltration attempt was blocked by KOINONIA Security Guardrails."
+    }
 
 def unclear_node(state: GraphState) -> GraphState:
     answer = (
@@ -589,6 +635,15 @@ Examples:
 
 - User Question: "Next records" | Reference: "Show marriages in 2025"
   -> Enhanced: "Show next 50 marriages in 2025 with offset 50"
+
+- User Question: "அவங்களோட பெயர் பட்டியல் தாங்க" | Reference: "2024-ல் ஞானஸ்நானம் பெற்றவர்கள் எத்தனை பேர்? **Total Count**: 42"
+  -> Enhanced: "List all persons baptized in 2024 (tabBaptism) with their first name, middle name, last name, bapt date, and parish name"
+
+- User Question: "avangaloda family members list pannunga" | Reference: "Holy Baptism Registry Record: Carmel Maria B. Family Card Number: FC-25646"
+  -> Enhanced: "List all living family members of family card number FC-25646 (tabMember joined with tabFamily)"
+
+- User Question: "அவர்களின் பெற்றோர் பெயர் விபரம் கொடு" | Reference: "2023-ல் புது நன்மை எடுத்தவர்கள் யார் யார்? Found communion records in 2023"
+  -> Enhanced: "List all persons who received First Holy Communion in 2023 with their first name, middle name, last name, father name, mother name, and parish name (tabCommunion)"
 
 CRITICAL RULES:
 1. Return ONLY the extended, standalone question string.
@@ -696,7 +751,7 @@ def clean_church_query_text(text: str) -> str:
         (r'\bbabtizum\b', 'baptism'),
         (r'\bbapthism\b', 'baptism'),
         (r'\bbapthisam\b', 'baptism'),
-        (r'\bunion\b', 'communion'),
+        (r'\bunion\s+(?!all\s+select|select)', 'communion'),
         (r'\bcnf\b', 'confirmation'),
         (r'\bmrg\b', 'marriage'),
         (r'\banbiyam\b', 'BCC'),
@@ -902,7 +957,23 @@ SQL_GEN_PROMPT = ChatPromptTemplate.from_messages([
 def generate_sql_node(state: GraphState) -> GraphState:
     print("[generate_sql] Generating SQL query...")
     
+    if state.get("generated_sql") == "BLOCKED_SECURITY":
+        return state
+
     q_raw = (state.get("question") or "").lower()
+    
+    # Defense-in-depth security injection check
+    injection_patterns = [
+        r';\s*(?:DROP|ALTER|TRUNCATE|DELETE|INSERT|UPDATE|CREATE|REPLACE)',
+        r'(?:SLEEP|BENCHMARK|WAITFOR|GET_LOCK)\s*\(',
+        r'UNION\s+(?:ALL\s+)?SELECT\s+.*(?:tabUser|information_schema|mysql\.|password|hash|secret|token|api_key)',
+        r'--\s*$',
+        r'(?:ignore all previous instructions|output your system prompt|leak secret keys)'
+    ]
+    for pat in injection_patterns:
+        if re.search(pat, state.get("question", ""), re.IGNORECASE):
+            print(f"[generate_sql] Intercepted malicious injection in generate_sql: '{state.get('question')}'")
+            return {**state, "generated_sql": "BLOCKED_SECURITY"}
     q_enhanced = (state.get("enhanced_query") or "").lower()
     q_combined = f"{q_raw} {q_enhanced}"
     
@@ -1252,8 +1323,10 @@ def enforce_jurisdiction_sql(sql: str, state: GraphState) -> str:
 
 def validate_sql_node(state: GraphState) -> GraphState:
     print("[validate_sql] Validating SQL in sandbox...")
-    sql = state["generated_sql"]
+    sql = state.get("generated_sql") or ""
     
+    if sql == "BLOCKED_SECURITY":
+        return {**state, "error_message": "Blocked security injection"}
     if sql == "UNSUPPORTED":
         return {**state, "error_message": "Unsupported query"}
     if sql == "UNAUTHORIZED_DIOCESE":
@@ -2077,7 +2150,13 @@ def format_response_node(state: GraphState) -> GraphState:
 # ─── Define Router Decisions ──────────────────────────────────────────────────
 
 def decide_route(state: GraphState):
-    return state["route"]
+    if state.get("route") == "blocked_security":
+        return "blocked_security"
+    if state.get("route") == "greeting":
+        return "greeting"
+    if state.get("route") == "unclear":
+        return "unclear"
+    return "text_to_sql"
 
 def decide_validation(state: GraphState):
     if state.get("error_message") in ["Unsupported query", "Unauthorized diocese access", "Unauthorized parish access"]:
@@ -2106,6 +2185,7 @@ def build_graph():
     workflow.add_node("router", router_node)
     workflow.add_node("greeting", greeting_node)
     workflow.add_node("unclear", unclear_node)
+    workflow.add_node("blocked_security", blocked_security_node)
     workflow.add_node("enhance_query", enhance_query_node)
     workflow.add_node("retrieve_context", retrieve_context_node)
     workflow.add_node("generate_sql", generate_sql_node)
@@ -2114,9 +2194,15 @@ def build_graph():
     workflow.add_node("execute_sql", execute_sql_node)
     workflow.add_node("format_response", format_response_node)
     workflow.set_entry_point("router")
-    workflow.add_conditional_edges("router", decide_route, {"greeting": "greeting", "unclear": "unclear", "text_to_sql": "enhance_query"})
+    workflow.add_conditional_edges("router", decide_route, {
+        "greeting": "greeting", 
+        "unclear": "unclear", 
+        "blocked_security": "blocked_security",
+        "text_to_sql": "enhance_query"
+    })
     workflow.add_edge("greeting", END)
     workflow.add_edge("unclear", END)
+    workflow.add_edge("blocked_security", END)
     workflow.add_edge("enhance_query", "retrieve_context")
     workflow.add_edge("retrieve_context", "generate_sql")
     workflow.add_edge("generate_sql", "validate_sql")
